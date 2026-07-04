@@ -34,7 +34,6 @@
 [data-theme="dark"] .segmented { background: #2C2740; }
 [data-theme="dark"] .seg.active { background: #4A3FA0; }
 [data-theme="dark"] .tick-btn { background: var(--input-bg); }
-[data-theme="dark"] .item-row.awaiting { background: #3A3320; }
 [data-theme="dark"] .undo-toast { background: #423699; }
 
 * { box-sizing: border-box; }
@@ -255,7 +254,6 @@ input:focus, select:focus, textarea:focus {
 }
 .item-row.done { opacity: 0.6; }
 .item-row.done .item-name { text-decoration: line-through; }
-.item-row.awaiting { background: #FFF8EC; }
 
 .tick-btn {
   width: 30px; height: 30px;
@@ -419,7 +417,7 @@ canvas { max-width: 100%; margin: 10px 0; }
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.tick-btn, .item-row.done, .item-row.awaiting {
+.tick-btn, .item-row.done, .item-row.editing {
   transition: background 0.2s ease, opacity 0.2s ease, border-color 0.2s ease;
 }
 
@@ -495,11 +493,49 @@ canvas { max-width: 100%; margin: 10px 0; }
   display: flex; align-items: center; justify-content: center;
   font-size: 24px;
 }
+.whatsapp-store-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.whatsapp-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.whatsapp-avatar {
+  width: 34px; height: 34px;
+  flex: 0 0 34px;
+  border-radius: 50%;
+  background: var(--success);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+.whatsapp-sender { font-weight: 700; font-size: 13.5px; color: var(--text-body); }
+.whatsapp-bubble-wrap { position: relative; }
+.whatsapp-bubble-wrap::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 18px;
+  width: 16px; height: 16px;
+  background: #DCF8C6;
+  clip-path: polygon(0 100%, 100% 100%, 100% 0);
+}
+[data-theme="dark"] .whatsapp-bubble-wrap::before { background: #1E3324; }
 .whatsapp-bubble {
   background: #DCF8C6;
   color: #1F2B1A;
   border: none;
-  border-radius: 16px;
+  border-radius: 4px 16px 16px 16px;
   line-height: 1.6;
 }
 [data-theme="dark"] .whatsapp-bubble { background: #1E3324; color: #DCF8C6; }
@@ -526,3 +562,165 @@ canvas { max-width: 100%; margin: 10px 0; }
 }
 .budget-bar-fill.over { background: var(--danger); }
 .budget-bar-fill.warn { background: #E0A32C; }
+
+/* ---- Name screen hero ---- */
+.name-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 0%, var(--primary-light) 0%, var(--bg) 65%);
+}
+.hero-badge {
+  width: 80px; height: 80px;
+  border-radius: 24px;
+  background: var(--primary);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 38px;
+  margin-bottom: 16px;
+  box-shadow: 0 10px 24px rgba(83,74,183,0.35);
+  animation: heroPop 0.4s ease;
+}
+@keyframes heroPop {
+  from { transform: scale(0.7); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.hero-dots {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.hero-dot {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+/* ---- Inline confirm-amount editing row (replaces the old Confirm tab) ---- */
+.item-row.editing {
+  background: #FFF8EC;
+  flex-wrap: wrap;
+}
+[data-theme="dark"] .item-row.editing { background: #3A3320; }
+.edit-fields {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.edit-fields input {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 13.5px;
+}
+.edit-fields .amount-input { flex: 0 0 90px; width: 90px; }
+.edit-fields .purchased-input { flex: 1 1 120px; width: auto; }
+
+/* ---- Inventory tab ---- */
+.inventory-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--card-bg);
+  border-radius: 16px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+.in-list-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--success);
+  font-size: 12.5px;
+  font-weight: 700;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* ---- Per-user avatars ---- */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 700;
+  vertical-align: middle;
+  flex: 0 0 auto;
+  line-height: 1;
+}
+
+/* ---- Today's shopper banner ---- */
+.shopper-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.shopper-icon {
+  width: 40px; height: 40px;
+  flex: 0 0 40px;
+  border-radius: 14px;
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 19px;
+}
+
+/* ---- Recurring items ---- */
+.recurring-card .row { margin-bottom: 4px; }
+.recurring-chip {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 14px;
+  border-radius: 999px;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.recurring-chip button {
+  width: 20px; height: 20px;
+  flex: 0 0 20px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.08);
+  color: inherit;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+/* ---- Custom "learned" inventory tag ---- */
+.custom-tag {
+  font-size: 10px;
+  background: var(--primary-light);
+  color: var(--primary);
+  padding: 2px 7px;
+  border-radius: 999px;
+  margin-left: 6px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+/* ---- Monthly summary banner ---- */
+.summary-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.summary-banner-icon {
+  width: 40px; height: 40px;
+  flex: 0 0 40px;
+  border-radius: 14px;
+  background: var(--success-light);
+  color: var(--success);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 19px;
+}

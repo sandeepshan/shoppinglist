@@ -29,6 +29,8 @@ This replaces the earlier household-based rules with a much simpler single-colle
 
 **Update (new — needed for the monthly budget feature):** `firestore.rules` now also allows a small `meta` collection (it stores the one shared monthly budget number so all 3 of you see the same value). If you've already published rules before, re-paste and re-publish `firestore.rules` once more — otherwise setting a budget will fail with a permissions error.
 
+**Update again (new — needed for recurring items):** `firestore.rules` now also allows a `recurringItems` collection ("Milk every Sunday" etc.). Re-paste and re-publish `firestore.rules` one more time if you'd already published an earlier version — otherwise adding a recurring item will fail with a permissions error.
+
 ## 4. Deploy
 
 Same as before — Netlify (drag-and-drop at app.netlify.com/drop, or connect your Git repo), or Firebase Hosting via the CLI. Once you have a live URL, add its domain to Firebase Console → Authentication → Settings → Authorized domains (still required, since Anonymous Auth is domain-restricted the same way).
@@ -43,21 +45,30 @@ Same as before — Netlify (drag-and-drop at app.netlify.com/drop, or connect yo
 - **3 users, no login**: one shared list per deployed link. Firebase Anonymous Auth runs invisibly in the background so Firestore's rules can require "signed in" without ever showing a login screen. Each person's name is just remembered locally on their device (tap "not you?" in the header to change it).
 - **Store categories**: Coles, Woolworths, Aldi, IGA, Indian Shop, Meat Shop, Costco — hardcoded in `app.js` (`PRESET_STORES`). Want more stores added? Just ask.
 - **Grocery categories**: 16 preset categories (`CATEGORIES` in `app.js`) selectable when adding any item.
-- **Pending → Confirm amount → Done**: ticking a pending item moves it to the **Confirm amounts** tab (badge shows how many are waiting). There, you type in what it actually cost and hit Confirm — that's what finalizes it as Done and feeds the Spend dashboard. "Back" on that screen returns it to Pending if you ticked by mistake.
-- **Spend dashboard**: stat pills (pending count, awaiting-price count, this month's total, all-time total), a monthly budget bar, a 6-month spend trend line, a spend-by-store chart, a spend-by-category chart, and a recent-purchases list — all built directly from the amounts you confirm, no receipt scanning needed.
+- **Pending → Done, inline**: ticking a pending item expands it right there in the List tab to ask for the amount and who bought it (remembers past names in a dropdown, defaulting to you) — hit the checkmark and it's Done, no separate tab needed. "Cancel" backs out without saving. Done items still show a pencil to correct the amount/purchaser afterward.
+- **Inventory tab**: a searchable catalog of ~120 common household items (grocery staples plus school/toddler essentials for an 11- and 3-year-old), grouped by category, each with a one-tap **Add** button — shows "In list" instead if it's already on your pending list.
+- **Spend dashboard**: stat pills (pending count, bought-this-month count, this month's total, all-time total), a monthly budget bar, a 6-month spend trend line, a spend-by-store chart, a spend-by-category chart, and a recent-purchases list (now showing who bought each item).
 - **Monthly budget**: tap the pencil on the Budget card in the Spend tab to set a shared monthly $ target — everyone sees the same bar, which turns amber near 80% and red once you go over.
 - **Quick-add chips**: items you've bought at least twice show up as tap-to-re-add chips above the add-item form (skipped for anything already pending), remembering the category and store you used last time.
 - **Item name autocomplete**: typing an item name you've added before will suggest it and auto-fill its usual category and store.
-- **WhatsApp nudge**: a warm, ready-to-send message ("Hi! Today's shopping list is...") listing all pending items grouped by store, with an item/store count up top, auto-updating as your list changes. Tap **Copy message**, then paste it into any WhatsApp chat yourself.
+- **Recurring items**: add "Milk, every Sunday" once in the List tab's Recurring card, and from then on it's auto-added as a pending item once that weekday arrives each week — checked whenever anyone opens the app (there's no server-side clock on the free plan, so it triggers on next app-open on/after the day, not at an exact time). Tap the × on a chip to stop a recurring item.
+- **Today's shopper**: a banner at the top of the List tab anyone can tap "I've got it" / "Take over" on to flag who's doing the shop. It doesn't auto-clear at midnight (no server clock), so it just shows the date it was last set.
+- **Per-user avatars**: everyone's name gets a consistent colored circle + initial (derived from the name itself, no accounts needed) — shown in the header, the shopper banner, purchased-by/added-by, recent purchases, and the WhatsApp chat header.
+- **Monthly spend summary**: once a new calendar month starts, the Spend tab shows a dismissible banner with last month's total, item count, and top stores, with a **Copy** button to paste into WhatsApp or email. Important: there's no way to make this *auto-send itself* to your family without a paid backend or WhatsApp's paid Business API — this gets it auto-drafted and ready, but someone still needs to open the Spend tab and tap Copy + paste once a month.
+- **Inventory learns your habits**: any item name added 3+ times that isn't already in the built-in catalog automatically shows up in the Inventory tab too (tagged "Yours"), grouped by category — no setup needed.
+- **CSV export**: the download icon next to "Recently bought" exports your full purchase history (name, category, store, amount, purchased by, date) as a CSV file you can open in Excel/Sheets.
+- **WhatsApp nudge**: a warm, ready-to-send message ("Hi! Today's shopping list is...") listing all pending items grouped by store, with an item/store count and a per-store breakdown up top, styled like an actual chat bubble. Tap **Copy message**, then paste it into any WhatsApp chat yourself.
 
 ## What changed from the very first version
 
 - Dropped the email magic-link sign-in and household join-codes — too much friction for a 3-person family list.
 - Dropped the bill-photo OCR scanning — replaced by simpler, more accurate per-item amount entry when marking something done.
-- WhatsApp went from an auto-opening `wa.me` link to a plain copy-paste draft, then to a warmer auto-drafted nudge message with item/store counts.
-- Navigation moved from a bottom nav to top tabs (List / Confirm amounts / Spend / WhatsApp), with a Confirm amounts badge showing how many items are waiting on a price.
-- Added dark mode, empty-state illustrations, category grouping in the list, a loading skeleton, quick-add chips, name autocomplete, a spend trend chart, and a shared monthly budget.
+- WhatsApp went from an auto-opening `wa.me` link to a plain copy-paste draft, then to a warmer auto-drafted nudge message with item/store counts and chat-bubble styling.
+- Removed the separate Confirm-amounts tab — confirming an item's price and who bought it now happens inline in the List tab the moment you tick it.
+- Navigation is now List / Inventory / Spend / WhatsApp top tabs.
+- Added dark mode, empty-state illustrations, category grouping in the list, a loading skeleton, quick-add chips, name autocomplete, a spend trend chart, a shared monthly budget, an Inventory catalog, and a friendlier illustrated first-run screen.
+- Added recurring items, a "today's shopper" banner, per-user colored avatars, an auto-drafted monthly spend summary, a self-learning Inventory catalog, and CSV export.
 
 ## Questions or want changes?
 
-Bring this project back to me any time — more preset stores, editing an item's price after the fact, weekly/yearly spend views, export to CSV, etc.
+Bring this project back to me any time — more preset stores, weekly/yearly spend views, or anything else.

@@ -17,10 +17,17 @@ service cloud.firestore {
       allow read, create, update, delete: if request.auth != null;
     }
 
-    // Small shared settings doc (e.g. meta/budget) — same everyone-can-edit
-    // model as items, just used for app-wide settings instead of list items.
+    // Small shared settings doc (e.g. meta/budget, meta/shopper) — same
+    // everyone-can-edit model as items, just used for app-wide settings
+    // instead of list items.
     match /meta/{docId} {
       allow read, write: if request.auth != null;
+    }
+
+    // Recurring items (e.g. "Milk every Sunday") — same everyone-can-edit
+    // model as items.
+    match /recurringItems/{docId} {
+      allow read, create, update, delete: if request.auth != null;
     }
   }
 }

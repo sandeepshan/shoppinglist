@@ -17,9 +17,17 @@
 <body>
 
 <!-- ======================= NAME SCREEN (shown once per device) ======================= -->
-<section id="name-screen" class="screen">
+<section id="name-screen" class="screen name-screen">
+  <div class="hero-badge"><i class="ti ti-shopping-cart" aria-hidden="true"></i></div>
+  <div class="hero-dots">
+    <span class="hero-dot" style="background:#EAF3DE; color:#27500A;"><i class="ti ti-apple" aria-hidden="true"></i></span>
+    <span class="hero-dot" style="background:#E6F1FB; color:#0C447C;"><i class="ti ti-milk" aria-hidden="true"></i></span>
+    <span class="hero-dot" style="background:#FBEAF0; color:#72243E;"><i class="ti ti-meat" aria-hidden="true"></i></span>
+    <span class="hero-dot" style="background:#FAEEDA; color:#633806;"><i class="ti ti-bread" aria-hidden="true"></i></span>
+    <span class="hero-dot" style="background:#EEEDFE; color:#26215C;"><i class="ti ti-bottle" aria-hidden="true"></i></span>
+  </div>
   <div class="card centered">
-    <h1><i class="ti ti-shopping-cart" aria-hidden="true"></i> Family Shopping List</h1>
+    <h1>Family Shopping List</h1>
     <p class="muted">What should we call you? This just labels who added or bought each item — no account, no login.</p>
     <input id="name-input" type="text" placeholder="e.g. Sandeep" />
     <button id="name-continue-btn" class="btn primary">Continue</button>
@@ -32,23 +40,52 @@
   <header class="app-header">
     <div>
       <strong>Family Shopping List</strong>
-      <div class="muted small">Hi, <span id="user-name-label"></span> · <button id="change-name-btn" class="link-btn">not you?</button></div>
+      <div class="muted small"><span id="header-avatar"></span> Hi, <span id="user-name-label"></span> · <button id="change-name-btn" class="link-btn">not you?</button></div>
     </div>
     <button id="theme-toggle-btn" class="icon-btn" aria-label="Toggle dark mode"><i class="ti ti-moon" aria-hidden="true"></i></button>
   </header>
 
   <nav class="top-tabs">
     <button class="tab-btn active" data-view="list"><i class="ti ti-list-check" aria-hidden="true"></i> List</button>
-    <button class="tab-btn" data-view="confirm"><i class="ti ti-receipt-2" aria-hidden="true"></i> Confirm <span class="tab-badge hidden" id="confirm-badge">0</span></button>
+    <button class="tab-btn" data-view="inventory"><i class="ti ti-category-2" aria-hidden="true"></i> Inventory</button>
     <button class="tab-btn" data-view="spend"><i class="ti ti-chart-bar" aria-hidden="true"></i> Spend</button>
     <button class="tab-btn" data-view="whatsapp"><i class="ti ti-brand-whatsapp" aria-hidden="true"></i> WhatsApp</button>
   </nav>
 
   <!-- ---- LIST VIEW ---- -->
   <div id="view-list" class="view">
+    <div class="card shopper-banner">
+      <div class="shopper-icon"><i class="ti ti-shopping-cart" aria-hidden="true"></i></div>
+      <div class="item-main">
+        <div class="item-name">Today's shopper</div>
+        <div class="item-meta" id="shopper-status">Not assigned yet</div>
+      </div>
+      <button id="assign-shopper-btn" class="btn primary small">I've got it</button>
+    </div>
+
+    <div class="card recurring-card">
+      <h2 style="margin-bottom:8px;"><i class="ti ti-repeat" aria-hidden="true"></i> Recurring items</h2>
+      <div class="row">
+        <input id="recurring-name-input" type="text" placeholder="Item name (e.g. Milk)" list="item-name-history" autocomplete="off" />
+        <select id="recurring-day-select">
+          <option value="0">Every Sunday</option>
+          <option value="1">Every Monday</option>
+          <option value="2">Every Tuesday</option>
+          <option value="3">Every Wednesday</option>
+          <option value="4">Every Thursday</option>
+          <option value="5">Every Friday</option>
+          <option value="6">Every Saturday</option>
+        </select>
+      </div>
+      <button id="add-recurring-btn" class="btn primary small"><i class="ti ti-plus" aria-hidden="true"></i> Add recurring item</button>
+      <div id="recurring-chips" class="quick-add-scroll hidden" style="margin-top:10px;"></div>
+      <p id="recurring-empty" class="muted small" style="margin-top:8px;">No recurring items yet — add one above, like Milk every Sunday.</p>
+    </div>
+
     <div class="add-item-card card">
       <input id="new-item-name" type="text" placeholder="Add an item... (e.g. Milk)" list="item-name-history" autocomplete="off" />
       <datalist id="item-name-history"></datalist>
+      <datalist id="purchased-by-history"></datalist>
       <div class="row">
         <select id="new-item-category"></select>
         <select id="new-item-store"></select>
@@ -76,21 +113,33 @@
     </div>
   </div>
 
-  <!-- ---- CONFIRM AMOUNTS VIEW ---- -->
-  <div id="view-confirm" class="view hidden">
-    <p class="muted small">Ticked items land here until you record what they cost.</p>
-    <ul id="confirm-list" class="items-list"></ul>
-    <div id="confirm-empty" class="empty-state hidden">
-      <div class="empty-illustration accent"><i class="ti ti-confetti" aria-hidden="true"></i></div>
-      <p>Nothing waiting on a price</p>
+  <!-- ---- INVENTORY VIEW ---- -->
+  <div id="view-inventory" class="view hidden">
+    <div class="card">
+      <input id="inventory-search" type="text" placeholder="Search common household items..." />
+    </div>
+    <ul id="inventory-list" class="items-list"></ul>
+    <div id="inventory-empty" class="empty-state hidden">
+      <div class="empty-illustration"><i class="ti ti-search-off" aria-hidden="true"></i></div>
+      <p>No matching items</p>
     </div>
   </div>
 
   <!-- ---- SPEND / DASHBOARD VIEW ---- -->
   <div id="view-spend" class="view hidden">
+    <div id="monthly-summary-banner" class="card summary-banner hidden">
+      <div class="summary-banner-icon"><i class="ti ti-chart-bar" aria-hidden="true"></i></div>
+      <div class="item-main">
+        <div class="item-name"><span id="summary-month-label"></span> summary ready</div>
+        <div class="item-meta" id="summary-total-label"></div>
+      </div>
+      <button id="copy-summary-btn" class="btn primary small">Copy</button>
+      <button id="dismiss-summary-btn" class="link-btn">Dismiss</button>
+    </div>
+
     <div class="stat-pill-row">
       <div class="stat-pill"><i class="ti ti-list-check" aria-hidden="true"></i> <strong id="stat-pending">0</strong> pending</div>
-      <div class="stat-pill"><i class="ti ti-receipt-2" aria-hidden="true"></i> <strong id="stat-awaiting">0</strong> awaiting price</div>
+      <div class="stat-pill"><i class="ti ti-check" aria-hidden="true"></i> <strong id="stat-done-month">0</strong> bought this month</div>
       <div class="stat-pill accent"><i class="ti ti-calendar" aria-hidden="true"></i> <strong id="stat-month-total">$0</strong> this month</div>
       <div class="stat-pill accent"><i class="ti ti-wallet" aria-hidden="true"></i> <strong id="stat-all-total">$0</strong> all time</div>
     </div>
@@ -123,7 +172,10 @@
     </div>
 
     <div class="card">
-      <h2><i class="ti ti-history" aria-hidden="true"></i> Recently bought</h2>
+      <div class="budget-header">
+        <h2 style="margin:0;"><i class="ti ti-history" aria-hidden="true"></i> Recently bought</h2>
+        <button id="export-csv-btn" class="edit-btn" aria-label="Export spend history as CSV"><i class="ti ti-download" aria-hidden="true"></i></button>
+      </div>
       <ul id="recent-done-list" class="receipts-list"></ul>
       <div id="recent-done-empty" class="empty-state hidden">
         <div class="empty-illustration"><i class="ti ti-receipt-2" aria-hidden="true"></i></div>
@@ -147,8 +199,19 @@
       <div class="stat-pill accent"><i class="ti ti-building-store" aria-hidden="true"></i> <strong id="whatsapp-store-count">0</strong> stores</div>
     </div>
 
+    <div id="whatsapp-store-breakdown" class="store-filter-scroll"></div>
+
     <div class="card">
-      <textarea id="whatsapp-message" class="whatsapp-bubble" rows="12" readonly></textarea>
+      <div class="whatsapp-chat-header">
+        <div id="whatsapp-avatar" class="whatsapp-avatar"><i class="ti ti-user" aria-hidden="true"></i></div>
+        <div>
+          <div class="whatsapp-sender">You</div>
+          <div class="muted small" id="whatsapp-timestamp">Just now</div>
+        </div>
+      </div>
+      <div class="whatsapp-bubble-wrap">
+        <textarea id="whatsapp-message" class="whatsapp-bubble" rows="12" readonly></textarea>
+      </div>
       <button id="copy-whatsapp-btn" class="btn whatsapp"><i class="ti ti-copy" aria-hidden="true"></i> Copy message</button>
       <p id="copy-status" class="muted small"></p>
     </div>
