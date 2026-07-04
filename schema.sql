@@ -1,0 +1,11 @@
+-- ============================================================
+-- DEPRECATED — this project now uses Firebase, not Supabase.
+--
+-- This file is no longer used. Ignore/delete it locally if you like.
+-- The Firebase equivalents are:
+--   firestore.rules   (database security rules)
+--   storage.rules     (receipt photo storage security rules)
+-- Categories and preset stores are now hardcoded in app.js
+-- (PRESET_STORES / CATEGORIES) instead of living in a database table.
+-- See SETUP_INSTRUCTIONS.md for the current Firebase setup steps.
+-- ============================================================
