@@ -453,3 +453,76 @@ canvas { max-width: 100%; margin: 10px 0; }
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* ---- Quick-add frequent-item chips ---- */
+.quick-add-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 0 12px;
+}
+.quick-add-chip {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1.5px dashed var(--border);
+  background: var(--card-bg);
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  margin: 0;
+  width: auto;
+}
+.quick-add-chip i { font-size: 13px; }
+
+/* ---- WhatsApp view ---- */
+.whatsapp-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.whatsapp-hero-icon {
+  width: 46px; height: 46px;
+  flex: 0 0 46px;
+  border-radius: 14px;
+  background: var(--success-light);
+  color: var(--success);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+}
+.whatsapp-bubble {
+  background: #DCF8C6;
+  color: #1F2B1A;
+  border: none;
+  border-radius: 16px;
+  line-height: 1.6;
+}
+[data-theme="dark"] .whatsapp-bubble { background: #1E3324; color: #DCF8C6; }
+
+/* ---- Monthly budget ---- */
+.budget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.budget-bar-track {
+  height: 14px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.budget-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--success);
+  transition: width 0.3s ease, background 0.3s ease;
+}
+.budget-bar-fill.over { background: var(--danger); }
+.budget-bar-fill.warn { background: #E0A32C; }

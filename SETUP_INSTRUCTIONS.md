@@ -27,6 +27,8 @@ The app signs every visitor in invisibly (no screen, no click) using Firebase's 
 
 This replaces the earlier household-based rules with a much simpler single-collection rule set. If you'd already published the old version, this update is required for the new app to work.
 
+**Update (new — needed for the monthly budget feature):** `firestore.rules` now also allows a small `meta` collection (it stores the one shared monthly budget number so all 3 of you see the same value). If you've already published rules before, re-paste and re-publish `firestore.rules` once more — otherwise setting a budget will fail with a permissions error.
+
 ## 4. Deploy
 
 Same as before — Netlify (drag-and-drop at app.netlify.com/drop, or connect your Git repo), or Firebase Hosting via the CLI. Once you have a live URL, add its domain to Firebase Console → Authentication → Settings → Authorized domains (still required, since Anonymous Auth is domain-restricted the same way).
@@ -42,15 +44,19 @@ Same as before — Netlify (drag-and-drop at app.netlify.com/drop, or connect yo
 - **Store categories**: Coles, Woolworths, Aldi, IGA, Indian Shop, Meat Shop, Costco — hardcoded in `app.js` (`PRESET_STORES`). Want more stores added? Just ask.
 - **Grocery categories**: 16 preset categories (`CATEGORIES` in `app.js`) selectable when adding any item.
 - **Pending → Confirm amount → Done**: ticking a pending item moves it to the **Confirm amounts** tab (badge shows how many are waiting). There, you type in what it actually cost and hit Confirm — that's what finalizes it as Done and feeds the Spend dashboard. "Back" on that screen returns it to Pending if you ticked by mistake.
-- **Spend dashboard**: stat pills (pending count, awaiting-price count, this month's total, all-time total), a spend-by-store chart, a spend-by-category chart, and a recent-purchases list — all built directly from the amounts you confirm, no receipt scanning needed.
-- **WhatsApp nudge**: the WhatsApp tab shows a ready-to-send message listing all pending items grouped by store, auto-updating as your list changes. Tap **Copy message**, then paste it into any WhatsApp chat yourself.
+- **Spend dashboard**: stat pills (pending count, awaiting-price count, this month's total, all-time total), a monthly budget bar, a 6-month spend trend line, a spend-by-store chart, a spend-by-category chart, and a recent-purchases list — all built directly from the amounts you confirm, no receipt scanning needed.
+- **Monthly budget**: tap the pencil on the Budget card in the Spend tab to set a shared monthly $ target — everyone sees the same bar, which turns amber near 80% and red once you go over.
+- **Quick-add chips**: items you've bought at least twice show up as tap-to-re-add chips above the add-item form (skipped for anything already pending), remembering the category and store you used last time.
+- **Item name autocomplete**: typing an item name you've added before will suggest it and auto-fill its usual category and store.
+- **WhatsApp nudge**: a warm, ready-to-send message ("Hi! Today's shopping list is...") listing all pending items grouped by store, with an item/store count up top, auto-updating as your list changes. Tap **Copy message**, then paste it into any WhatsApp chat yourself.
 
 ## What changed from the very first version
 
 - Dropped the email magic-link sign-in and household join-codes — too much friction for a 3-person family list.
 - Dropped the bill-photo OCR scanning — replaced by simpler, more accurate per-item amount entry when marking something done.
-- WhatsApp went from an auto-opening `wa.me` link to a plain copy-paste draft — more reliable, works the same on every device.
+- WhatsApp went from an auto-opening `wa.me` link to a plain copy-paste draft, then to a warmer auto-drafted nudge message with item/store counts.
 - Navigation moved from a bottom nav to top tabs (List / Confirm amounts / Spend / WhatsApp), with a Confirm amounts badge showing how many items are waiting on a price.
+- Added dark mode, empty-state illustrations, category grouping in the list, a loading skeleton, quick-add chips, name autocomplete, a spend trend chart, and a shared monthly budget.
 
 ## Questions or want changes?
 

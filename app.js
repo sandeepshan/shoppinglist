@@ -4,7 +4,7 @@ import {
   getAuth, signInAnonymously, onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc,
+  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, setDoc,
   query, orderBy, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -55,6 +55,8 @@ let activeStoreFilter = "all";
 let activeStatusFilter = "pending";
 let currentView = "list";
 let unsubItems = null;
+let monthlyBudget = null;
+let unsubBudget = null;
 
 const $ = (id) => document.getElementById(id);
 const allStores = () => PRESET_STORES;
@@ -153,8 +155,56 @@ function startApp() {
   renderStoreFilterChips();
   renderSkeleton();
   subscribeItems();
+  subscribeBudget();
   showScreen("app-screen");
   showView("list");
+}
+
+// ------------------------------------------------------------------
+// Shared monthly budget (one doc, visible/editable by everyone)
+// ------------------------------------------------------------------
+function subscribeBudget() {
+  if (unsubBudget) unsubBudget();
+  const budgetRef = doc(db, "meta", "budget");
+  unsubBudget = onSnapshot(budgetRef, (snap) => {
+    const data = snap.exists() ? snap.data() : null;
+    monthlyBudget = data && typeof data.monthlyBudget === "number" ? data.monthlyBudget : null;
+    if (currentView === "spend") renderDashboard();
+  });
+}
+
+$("edit-budget-btn").addEventListener("click", async () => {
+  const current = monthlyBudget != null ? monthlyBudget : "";
+  const next = window.prompt("Set the shared monthly shopping budget ($):", current);
+  if (next === null) return;
+  const parsed = parseFloat(next);
+  if (!parsed || parsed <= 0) {
+    alert("Enter a valid amount.");
+    return;
+  }
+  await setDoc(doc(db, "meta", "budget"), { monthlyBudget: parsed }, { merge: true });
+});
+
+function renderBudget(monthTotal) {
+  const setEl = $("budget-set");
+  const unsetEl = $("budget-unset");
+  if (monthlyBudget == null) {
+    setEl.classList.add("hidden");
+    unsetEl.classList.remove("hidden");
+    return;
+  }
+  unsetEl.classList.add("hidden");
+  setEl.classList.remove("hidden");
+
+  const pct = Math.min(100, (monthTotal / monthlyBudget) * 100);
+  const fill = $("budget-bar-fill");
+  fill.style.width = `${pct}%`;
+  fill.classList.remove("warn", "over");
+  if (monthTotal > monthlyBudget) fill.classList.add("over");
+  else if (pct >= 80) fill.classList.add("warn");
+
+  const pctLabel = Math.round((monthTotal / monthlyBudget) * 100);
+  $("budget-caption").textContent = `$${monthTotal.toFixed(2)} of $${monthlyBudget.toFixed(2)} spent this month (${pctLabel}%)`;
 }
 
 // ------------------------------------------------------------------
@@ -231,6 +281,88 @@ function renderStoreFilterChips() {
 }
 
 // ------------------------------------------------------------------
+// Frequent-item stats — powers quick-add chips + name autocomplete
+// ------------------------------------------------------------------
+function buildNameStats() {
+  // items is ordered createdAt desc, so the first entry seen per name
+  // is also the most recently used category/store for that name.
+  const stats = new Map();
+  items.forEach((it) => {
+    const key = (it.name || "").trim().toLowerCase();
+    if (!key) return;
+    if (!stats.has(key)) {
+      stats.set(key, { name: it.name, categoryId: it.categoryId, storeId: it.storeId, count: 0 });
+    }
+    stats.get(key).count += 1;
+  });
+  return stats;
+}
+
+function renderQuickAddChips() {
+  const stats = buildNameStats();
+  const activeKeys = new Set(
+    items
+      .filter((i) => (i.status === "pending" || i.status === "awaiting_amount") && !pendingDeletes.has(i.id))
+      .map((i) => (i.name || "").trim().toLowerCase())
+  );
+  const frequent = [...stats.entries()]
+    .filter(([key, v]) => v.count >= 2 && !activeKeys.has(key))
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 8);
+
+  const el = $("quick-add-scroll");
+  if (frequent.length === 0) {
+    el.classList.add("hidden");
+    el.innerHTML = "";
+    return;
+  }
+  el.classList.remove("hidden");
+  el.innerHTML = frequent.map(([key, v]) => (
+    `<button class="quick-add-chip" data-key="${escapeHtml(key)}"><i class="ti ti-plus" aria-hidden="true"></i> ${escapeHtml(v.name)}</button>`
+  )).join("");
+}
+
+$("quick-add-scroll").addEventListener("click", async (e) => {
+  const btn = e.target.closest(".quick-add-chip");
+  if (!btn) return;
+  const stats = buildNameStats();
+  const v = stats.get(btn.dataset.key);
+  if (!v) return;
+  const category = CATEGORIES.find((c) => c.id === v.categoryId);
+  const store = allStores().find((s) => s.id === v.storeId);
+  await addDoc(collection(db, "items"), {
+    name: v.name,
+    categoryId: category ? category.id : null,
+    categoryName: category ? category.name : null,
+    categoryIcon: category ? category.icon : null,
+    storeId: store ? store.id : null,
+    storeName: store ? store.name : null,
+    storeIcon: store ? store.emoji : null,
+    quantity: null,
+    status: "pending",
+    amount: null,
+    addedBy: userName,
+    createdAt: serverTimestamp(),
+    doneAt: null,
+  });
+});
+
+function renderNameDatalist() {
+  const stats = buildNameStats();
+  const names = [...new Set([...stats.values()].map((v) => v.name).filter(Boolean))];
+  $("item-name-history").innerHTML = names.map((n) => `<option value="${escapeHtml(n)}"></option>`).join("");
+}
+
+$("new-item-name").addEventListener("input", () => {
+  const typed = $("new-item-name").value.trim().toLowerCase();
+  if (!typed) return;
+  const match = buildNameStats().get(typed);
+  if (!match) return;
+  if (match.categoryId) $("new-item-category").value = match.categoryId;
+  if (match.storeId) $("new-item-store").value = match.storeId;
+});
+
+// ------------------------------------------------------------------
 // Realtime subscription — single shared list, no household scoping
 // ------------------------------------------------------------------
 function subscribeItems() {
@@ -240,6 +372,8 @@ function subscribeItems() {
     items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderItems();
     renderConfirmBadge();
+    renderQuickAddChips();
+    renderNameDatalist();
     if (currentView === "confirm") renderConfirm();
     if (currentView === "spend") renderDashboard();
     if (currentView === "whatsapp") renderWhatsApp();
@@ -446,6 +580,7 @@ function scheduleDelete(id) {
   pendingDeletes.add(id);
   renderItems();
   renderConfirmBadge();
+  renderQuickAddChips();
 
   $("undo-toast-text").textContent = item ? `Deleted "${item.name}"` : "Item deleted";
   $("undo-toast").classList.remove("hidden");
@@ -463,6 +598,7 @@ $("undo-toast-btn").addEventListener("click", () => {
   $("undo-toast").classList.add("hidden");
   renderItems();
   renderConfirmBadge();
+  renderQuickAddChips();
 });
 
 // ------------------------------------------------------------------
@@ -520,6 +656,7 @@ $("confirm-list").addEventListener("click", async (e) => {
 // ------------------------------------------------------------------
 let chartByStore = null;
 let chartByCategory = null;
+let chartTrend = null;
 
 function renderDashboard() {
   const doneItems = items.filter((i) => i.status === "done" && !pendingDeletes.has(i.id));
@@ -538,6 +675,40 @@ function renderDashboard() {
   $("stat-awaiting").textContent = items.filter((i) => i.status === "awaiting_amount").length;
   $("stat-month-total").textContent = `$${monthTotal.toFixed(2)}`;
   $("stat-all-total").textContent = `$${allTimeTotal.toFixed(2)}`;
+
+  renderBudget(monthTotal);
+
+  // Spend over time (last 6 months)
+  const trendMonths = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    trendMonths.push({ year: d.getFullYear(), month: d.getMonth(), label: d.toLocaleDateString(undefined, { month: "short" }) });
+  }
+  const trendTotals = trendMonths.map(({ year, month }) => doneItems
+    .filter((i) => {
+      const d = i.doneAt && i.doneAt.toDate ? i.doneAt.toDate() : null;
+      return d && d.getFullYear() === year && d.getMonth() === month;
+    })
+    .reduce((sum, i) => sum + Number(i.amount || 0), 0));
+
+  const ctxTrend = $("chart-trend").getContext("2d");
+  if (chartTrend) chartTrend.destroy();
+  chartTrend = new Chart(ctxTrend, {
+    type: "line",
+    data: {
+      labels: trendMonths.map((m) => m.label),
+      datasets: [{
+        label: "Spend ($)",
+        data: trendTotals,
+        borderColor: "#534AB7",
+        backgroundColor: "rgba(83,74,183,0.15)",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+      }],
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+  });
 
   // Spend by store
   const byStore = {};
@@ -604,24 +775,36 @@ function renderDashboard() {
 // ------------------------------------------------------------------
 function buildWhatsAppMessage() {
   const pending = items.filter((i) => i.status === "pending");
-  if (pending.length === 0) return `🛒 Shopping list is all done! 🎉`;
+  const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+
+  if (pending.length === 0) {
+    return `Hey! 👋 Nothing left on today's shopping list (${today}) — we're all done! 🎉`;
+  }
 
   const byStore = {};
   pending.forEach((item) => {
     const label = item.storeName ? `${item.storeIcon || ""} ${item.storeName}`.trim() : "Unassigned";
     if (!byStore[label]) byStore[label] = [];
-    byStore[label].push(`- ${item.name}${item.quantity ? ` (${item.quantity})` : ""}`);
+    byStore[label].push(`• ${item.name}${item.quantity ? ` (${item.quantity})` : ""}`);
   });
 
-  let msg = `🛒 *Shopping List*\n`;
+  const storeCount = Object.keys(byStore).length;
+  const itemWord = pending.length === 1 ? "item" : "items";
+  const storeWord = storeCount === 1 ? "store" : "stores";
+
+  let msg = `Hi! 👋 Today's shopping list (${today}) — ${pending.length} ${itemWord} across ${storeCount} ${storeWord}:\n`;
   for (const [store, lines] of Object.entries(byStore)) {
     msg += `\n*${store}*\n${lines.join("\n")}\n`;
   }
-  msg += `\nSent via Family Shopping List app`;
+  msg += `\nCan you grab these today? Thank you! 🛒`;
   return msg;
 }
 
 function renderWhatsApp() {
+  const pending = items.filter((i) => i.status === "pending");
+  const storeCount = new Set(pending.map((i) => i.storeId || "unassigned")).size;
+  $("whatsapp-item-count").textContent = pending.length;
+  $("whatsapp-store-count").textContent = storeCount;
   $("whatsapp-message").value = buildWhatsAppMessage();
   $("copy-status").textContent = "";
 }

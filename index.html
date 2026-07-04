@@ -47,7 +47,8 @@
   <!-- ---- LIST VIEW ---- -->
   <div id="view-list" class="view">
     <div class="add-item-card card">
-      <input id="new-item-name" type="text" placeholder="Add an item... (e.g. Milk)" />
+      <input id="new-item-name" type="text" placeholder="Add an item... (e.g. Milk)" list="item-name-history" autocomplete="off" />
+      <datalist id="item-name-history"></datalist>
       <div class="row">
         <select id="new-item-category"></select>
         <select id="new-item-store"></select>
@@ -57,6 +58,8 @@
         <button id="add-item-btn" class="btn primary"><i class="ti ti-plus" aria-hidden="true"></i> Add</button>
       </div>
     </div>
+
+    <div class="quick-add-scroll hidden" id="quick-add-scroll"></div>
 
     <div class="store-filter-scroll" id="store-filter-scroll"></div>
 
@@ -93,6 +96,23 @@
     </div>
 
     <div class="card">
+      <div class="budget-header">
+        <h2 style="margin:0;"><i class="ti ti-target-arrow" aria-hidden="true"></i> Monthly budget</h2>
+        <button id="edit-budget-btn" class="edit-btn" aria-label="Set monthly budget"><i class="ti ti-pencil" aria-hidden="true"></i></button>
+      </div>
+      <div id="budget-set" class="hidden">
+        <div class="budget-bar-track"><div id="budget-bar-fill" class="budget-bar-fill"></div></div>
+        <p id="budget-caption" class="muted small" style="margin:8px 0 0;"></p>
+      </div>
+      <p id="budget-unset" class="muted small">No monthly budget set yet — tap the pencil to add one so everyone can see how spending is tracking.</p>
+    </div>
+
+    <div class="card">
+      <h2><i class="ti ti-trending-up" aria-hidden="true"></i> Spend over time</h2>
+      <canvas id="chart-trend" height="160"></canvas>
+    </div>
+
+    <div class="card">
       <h2><i class="ti ti-building-store" aria-hidden="true"></i> Spend by store</h2>
       <canvas id="chart-by-store" height="180"></canvas>
     </div>
@@ -114,10 +134,21 @@
 
   <!-- ---- WHATSAPP VIEW ---- -->
   <div id="view-whatsapp" class="view hidden">
+    <div class="card whatsapp-hero">
+      <div class="whatsapp-hero-icon"><i class="ti ti-brand-whatsapp" aria-hidden="true"></i></div>
+      <div>
+        <h2 style="margin-bottom:2px;">Nudge message</h2>
+        <p class="muted small" style="margin:0;">Drafted for you, ready to paste into any WhatsApp chat.</p>
+      </div>
+    </div>
+
+    <div class="stat-pill-row">
+      <div class="stat-pill accent"><i class="ti ti-list-check" aria-hidden="true"></i> <strong id="whatsapp-item-count">0</strong> items</div>
+      <div class="stat-pill accent"><i class="ti ti-building-store" aria-hidden="true"></i> <strong id="whatsapp-store-count">0</strong> stores</div>
+    </div>
+
     <div class="card">
-      <h2><i class="ti ti-brand-whatsapp" aria-hidden="true"></i> Nudge message</h2>
-      <p class="muted small">Copy this and paste it into any WhatsApp chat — updates automatically as your list changes.</p>
-      <textarea id="whatsapp-message" rows="12" readonly></textarea>
+      <textarea id="whatsapp-message" class="whatsapp-bubble" rows="12" readonly></textarea>
       <button id="copy-whatsapp-btn" class="btn whatsapp"><i class="ti ti-copy" aria-hidden="true"></i> Copy message</button>
       <p id="copy-status" class="muted small"></p>
     </div>
