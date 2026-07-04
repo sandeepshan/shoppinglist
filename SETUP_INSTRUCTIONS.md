@@ -1,75 +1,55 @@
 # Family Shopping List — Setup Guide (Firebase)
 
-Files: `index.html`, `styles.css`, `app.js`, `config.js`, `firestore.rules`, `storage.rules`.
-(`schema.sql` is leftover from an earlier Supabase version — ignore/delete it.)
+Files: `index.html`, `styles.css`, `app.js`, `config.js`, `firestore.rules`.
+(`schema.sql` and `storage.rules` are leftover from earlier versions — ignore/delete them.)
 
-Total setup time: ~15 minutes, one time only.
+This build has no login, no household codes, no Storage — everyone with the app link shares one list, and it runs entirely on the free Spark plan. No credit card, ever.
 
-## 1. Create your Firebase project (or reuse an existing one)
+## 1. Firebase project
 
-1. Go to console.firebase.google.com → **Add project** (or open a project you already have).
-2. Once created, click the **Web** icon (`</>`) to register a web app. Give it any name.
-3. Firebase shows you a `firebaseConfig` object — copy it.
+Already done — `config.js` has your real project values (`sandy-shoppinglist`).
 
-## 2. Connect the app to your project
+## 2. Enable Anonymous authentication
 
-`config.js` in this folder already has your real project's values filled in — nothing to do here unless you create a different Firebase project later.
-
-## 3. Turn on Email Link (passwordless) sign-in
+The app signs every visitor in invisibly (no screen, no click) using Firebase's Anonymous Auth, just so Firestore's security rules have something to check. To turn it on:
 
 1. Firebase Console → **Authentication** → **Sign-in method**.
-2. Enable **Email/Password** provider, then toggle on **Email link (passwordless sign-in)** underneath it.
-3. Under **Authentication → Settings → Authorized domains**, add the domain you'll host on (e.g. `your-app.web.app`, or your Netlify domain — see step 5).
+2. Click **Anonymous** in the provider list → toggle **Enable** → **Save**.
 
-## 4. Create Firestore + Storage
+(You can leave Email/Password and Email link off now — they're no longer used.)
 
-1. **Firestore Database** → **Create database** → start in **production mode** → pick a region.
-2. **Storage** → **Get started** → production mode → same region.
-3. Paste the contents of `firestore.rules` into **Firestore Database → Rules** → **Publish**.
-4. Paste the contents of `storage.rules` into **Storage → Rules** → **Publish**.
+## 3. Firestore rules
 
-(If you prefer the CLI: `npm i -g firebase-tools`, `firebase login`, `firebase init` selecting Firestore + Storage + Hosting, then `firebase deploy`.)
+1. **Firestore Database** → **Rules** tab.
+2. Select all the existing text, delete it, paste in the entire contents of `firestore.rules`, then **Publish**.
 
-## 5. Put it online
+This replaces the earlier household-based rules with a much simpler single-collection rule set. If you'd already published the old version, this update is required for the new app to work.
 
-Two easy options:
+## 4. Deploy
 
-**A. Firebase Hosting (recommended since you're already on Firebase)**
-```
-npm i -g firebase-tools
-firebase login
-firebase init hosting   # point the public directory at this folder
-firebase deploy
-```
-You'll get a URL like `https://sandy-shoppinglist.web.app`.
+Same as before — Netlify (drag-and-drop at app.netlify.com/drop, or connect your Git repo), or Firebase Hosting via the CLI. Once you have a live URL, add its domain to Firebase Console → Authentication → Settings → Authorized domains (still required, since Anonymous Auth is domain-restricted the same way).
 
-**B. Netlify Drop (zero install)**
-Go to app.netlify.com/drop and drag this whole folder onto the page.
+## 5. First-time use
 
-Either way — add that final URL to Firebase's **Authorized domains** list (step 3.3) or email links won't complete sign-in.
-
-## 6. First-time use
-
-1. Open the URL on your phone, enter your email, tap the sign-in link Firebase emails you.
-2. Enter your name, choose **Start a new list**, name your household — this generates a 6-character join code shown at the top of the app.
-3. Share that code with your other 2 family members. They open the same URL, sign in with their own email, choose **Join my family's list**, and enter the code.
-4. All 3 of you now share one live list — ticking an item off updates instantly for everyone (Firestore real-time listeners).
+1. Open the URL — no sign-in step. First time on a device, it just asks "What should we call you?" (stored on that device only, no account).
+2. You're straight into the shared list. Share the same URL with your other 2 family members — they each get asked their name once too, and everyone sees the same live list.
 
 ## How each feature works
 
-- **3 users**: each signs in with their own email via a passwordless link; all 3 share one "household" doc via the join code.
-- **Store categories**: Coles, Woolworths, Aldi, IGA, Indian Shop, Meat Shop, Costco are hardcoded presets (in `app.js`, `PRESET_STORES`) — no DB round trip needed. Custom stores can be added by writing to the household's `stores` subcollection (no button for it yet — say the word and I'll add one).
-- **Grocery categories**: 16 preset categories (`CATEGORIES` in `app.js`), selectable when adding any item.
-- **Bill photo → dashboard**: on the Spend tab, pick store/date, upload the photo. OCR (Tesseract.js, runs free in your browser) auto-detects the total; you confirm/edit it, then it saves to Firestore + the image to Firebase Storage. Dashboard shows monthly spend, spend by store, and a 6-month trend.
-- **Pending → Done**: tap the circle next to any item to tick it off; it updates instantly for all 3 users via Firestore's real-time `onSnapshot` listeners.
-- **WhatsApp nudge**: the green "Nudge via WhatsApp" button builds a message listing all pending items grouped by store, then opens WhatsApp with it pre-filled. Leave the phone field blank to pick any contact inside WhatsApp each time, or enter a number (with country code, e.g. `+61...`) to remember it and send straight to that person. No API keys, no cost — it's just a `wa.me` share link, so you still tap Send yourself inside WhatsApp.
+- **3 users, no login**: one shared list per deployed link. Firebase Anonymous Auth runs invisibly in the background so Firestore's rules can require "signed in" without ever showing a login screen. Each person's name is just remembered locally on their device (tap "not you?" in the header to change it).
+- **Store categories**: Coles, Woolworths, Aldi, IGA, Indian Shop, Meat Shop, Costco — hardcoded in `app.js` (`PRESET_STORES`). Want more stores added? Just ask.
+- **Grocery categories**: 16 preset categories (`CATEGORIES` in `app.js`) selectable when adding any item.
+- **Pending → Confirm amount → Done**: ticking a pending item moves it to the **Confirm amounts** tab (badge shows how many are waiting). There, you type in what it actually cost and hit Confirm — that's what finalizes it as Done and feeds the Spend dashboard. "Back" on that screen returns it to Pending if you ticked by mistake.
+- **Spend dashboard**: stat pills (pending count, awaiting-price count, this month's total, all-time total), a spend-by-store chart, a spend-by-category chart, and a recent-purchases list — all built directly from the amounts you confirm, no receipt scanning needed.
+- **WhatsApp nudge**: the WhatsApp tab shows a ready-to-send message listing all pending items grouped by store, auto-updating as your list changes. Tap **Copy message**, then paste it into any WhatsApp chat yourself.
 
-## Known limitations (easy to improve later)
+## What changed from the very first version
 
-- Receipt OCR reliably extracts the **total** only, not itemized line items — receipt formats vary too much for simple text matching. Swapping in a vision-capable AI call (e.g. Claude) instead of Tesseract would enable per-item categorization if you want that later.
-- No in-app button yet to add a custom store (e.g. a specific local shop) — quick to add.
-- The WhatsApp button requires the person tapping Send inside WhatsApp — a fully automatic send (no tap) would need a paid WhatsApp Business API account (Meta or Twilio) with business verification and approved templates.
+- Dropped the email magic-link sign-in and household join-codes — too much friction for a 3-person family list.
+- Dropped the bill-photo OCR scanning — replaced by simpler, more accurate per-item amount entry when marking something done.
+- WhatsApp went from an auto-opening `wa.me` link to a plain copy-paste draft — more reliable, works the same on every device.
+- Navigation moved from a bottom nav to top tabs (List / Confirm amounts / Spend / WhatsApp), with a Confirm amounts badge showing how many items are waiting on a price.
 
 ## Questions or want changes?
 
-Bring this project back to me any time — custom store button, automatic WhatsApp Business sending, per-item receipt parsing, budgets/alerts, CSV export, etc.
+Bring this project back to me any time — more preset stores, editing an item's price after the fact, weekly/yearly spend views, export to CSV, etc.

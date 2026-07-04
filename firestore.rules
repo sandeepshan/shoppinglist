@@ -3,55 +3,18 @@ rules_version = '2';
 // ============================================================
 // Firestore security rules — Family Shopping List
 // Deploy: Firebase Console > Firestore Database > Rules tab > paste > Publish
-// (or `firebase deploy --only firestore:rules` if using the CLI)
+//
+// No accounts, no household codes — this is a single shared list for
+// everyone who has the app link. The only gate is Firebase Anonymous
+// Auth, which the app signs every visitor into automatically and
+// invisibly (no login screen). This blocks raw/unauthenticated API
+// abuse while keeping the app itself completely login-free for users.
 // ============================================================
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function signedIn() {
-      return request.auth != null;
-    }
-
-    function isMember(householdId) {
-      return signedIn() &&
-        exists(/databases/$(database)/documents/households/$(householdId)/members/$(request.auth.uid));
-    }
-
-    // Each user's own profile: { displayName, householdId }
-    match /users/{uid} {
-      allow read, write: if signedIn() && request.auth.uid == uid;
-    }
-
-    // Join-code lookup table: joinCodes/{CODE} -> { householdId }
-    match /joinCodes/{code} {
-      allow read: if signedIn();
-      allow create: if signedIn(); // only happens when creating a new household
-      allow update, delete: if false;
-    }
-
-    match /households/{householdId} {
-      allow read: if isMember(householdId);
-      allow create: if signedIn(); // anyone signed in can start a new household
-      allow update, delete: if false;
-
-      match /members/{uid} {
-        allow read: if isMember(householdId);
-        // a user can only ever add themself as a member
-        allow create: if signedIn() && request.auth.uid == uid;
-        allow update, delete: if false;
-      }
-
-      match /stores/{storeId} {
-        allow read, create, update, delete: if isMember(householdId);
-      }
-
-      match /items/{itemId} {
-        allow read, create, update, delete: if isMember(householdId);
-      }
-
-      match /receipts/{receiptId} {
-        allow read, create, update, delete: if isMember(householdId);
-      }
+    match /items/{itemId} {
+      allow read, create, update, delete: if request.auth != null;
     }
   }
 }
