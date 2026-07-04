@@ -32,7 +32,7 @@ const CATEGORIES = [
   { id: "meat", name: "Meat & Poultry", icon: "ti-meat", bg: "#FBEAF0", fg: "#72243E" },
   { id: "seafood", name: "Seafood", icon: "ti-fish", bg: "#E1F5EE", fg: "#085041" },
   { id: "bakery", name: "Bakery", icon: "ti-bread", bg: "#FAEEDA", fg: "#633806" },
-  { id: "grains", name: "Rice, Grains & Lentils", icon: "ti-wheat", bg: "#FAEEDA", fg: "#633806" },
+  { id: "grains", name: "Rice, Grains & Lentils", icon: "ti-grain", bg: "#FAEEDA", fg: "#633806" },
   { id: "pantry", name: "Pantry & Dry Goods", icon: "ti-package", bg: "#F1EFE8", fg: "#444441" },
   { id: "spices", name: "Spices & Condiments", icon: "ti-flame", bg: "#FAECE7", fg: "#712B13" },
   { id: "frozen", name: "Frozen Foods", icon: "ti-snowflake", bg: "#E6F1FB", fg: "#0C447C" },

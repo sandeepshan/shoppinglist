@@ -1,9 +1,11 @@
 # Family Shopping List — Setup Guide (Firebase)
 
-Files: `index.html`, `styles.css`, `app.js`, `config.js`, `firestore.rules`, `manifest.json`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`.
+Files: `index.html`, `styles.css`, `app.js`, `config.js`, `firestore.rules`, `manifest.json`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, and the **`icons/` folder** (contains `icons/tabler-icons.min.css` and `icons/fonts/tabler-icons.woff2`).
 (`schema.sql` and `storage.rules` are leftover from earlier versions — ignore/delete them.)
 
-Push all of these to your repo (including the icon files and `manifest.json`) so "Add to Home Screen" picks up the app icon correctly.
+Push all of these to your repo (including the icon files, `manifest.json`, and the whole `icons/` folder) so "Add to Home Screen" picks up the app icon correctly and the in-app icons (tick marks, tabs, buttons) actually render.
+
+**Important (new):** the app's UI icons used to load from a third-party CDN (jsdelivr). That CDN turned out to be unreliable/blocked on at least one real device, which made every icon-only button (like the export/clear icons on the Spend tab) invisible with nothing to indicate they were even there. The icon font is now self-hosted in the `icons/` folder shipped with the app, so it no longer depends on any external CDN at all — make sure `icons/` (both the `.css` file and the `fonts/tabler-icons.woff2` file inside it) gets pushed to your repo along with everything else, or the icons will be missing again.
 
 This build has no login, no household codes, no Storage — everyone with the app link shares one list, and it runs entirely on the free Spark plan. No credit card, ever.
 
