@@ -535,7 +535,7 @@ function renderRecurringChips() {
   $("recurring-empty").classList.add("hidden");
   el.classList.remove("hidden");
   el.innerHTML = recurringItems.map((r) => (
-    `<span class="recurring-chip">${escapeHtml(r.name)} · ${DAY_NAMES[r.dayOfWeek]}s
+    `<span class="recurring-chip">${escapeHtml(r.name)} · ${DAY_NAMES[r.dayOfWeek]}s${r.storeName ? ` · ${escapeHtml(r.storeName)}` : ""}
       <button data-action="delete-recurring" data-id="${r.id}" aria-label="Remove"><i class="ti ti-x" aria-hidden="true"></i></button>
     </span>`
   )).join("");
@@ -547,13 +547,21 @@ $("recurring-chips").addEventListener("click", async (e) => {
   await deleteDoc(doc(db, "recurringItems", btn.dataset.id));
 });
 
+$("recurring-name-input").addEventListener("input", () => {
+  const typed = $("recurring-name-input").value.trim().toLowerCase();
+  if (!typed) return;
+  const match = buildNameStats().get(typed);
+  if (!match || !match.storeId) return;
+  $("recurring-store-select").value = match.storeId;
+});
+
 $("add-recurring-btn").addEventListener("click", async () => {
   const name = $("recurring-name-input").value.trim();
   if (!name) return;
   const dayOfWeek = parseInt($("recurring-day-select").value, 10);
   const match = buildNameStats().get(name.toLowerCase());
   const category = match ? CATEGORIES.find((c) => c.id === match.categoryId) : null;
-  const store = match ? allStores().find((s) => s.id === match.storeId) : null;
+  const store = allStores().find((s) => s.id === $("recurring-store-select").value);
 
   await addDoc(collection(db, "recurringItems"), {
     name,
@@ -630,6 +638,7 @@ function populateSelects() {
 
   const storeOptions = allStores().map((s) => `<option value="${s.id}">${s.emoji || ""} ${s.name}</option>`).join("");
   $("new-item-store").innerHTML = storeOptions;
+  $("recurring-store-select").innerHTML = storeOptions;
 }
 
 function renderStoreFilterChips() {
@@ -1705,20 +1714,24 @@ const WHATSAPP_SCENARIOS = {
     greeting: (today, count, itemWord, storeCount, storeWord) =>
       `Hi! 👋 Today's shopping list (${today}) — ${count} ${itemWord} across ${storeCount} ${storeWord}:`,
     closing: "Can you grab these today? Thank you! 🛒",
+    empty: (today) => `Hey! 👋 Nothing left on today's shopping list (${today}) — we're all done! 🎉`,
   },
   urgent: {
     greeting: (today, count, itemWord, storeCount, storeWord) =>
       `🚨 Need these ASAP if you can swing by today (${today}) — ${count} ${itemWord} across ${storeCount} ${storeWord}:`,
     closing: "Sorry for the short notice — really appreciate it! 🙏",
+    empty: (today) => `🚨 Just checking — nothing urgent on the list right now (${today}), all clear! 🎉`,
   },
   weekly: {
     greeting: (today, count, itemWord, storeCount, storeWord) =>
       `🛒 Weekly shop time! Full list for this week (${today}) — ${count} ${itemWord} across ${storeCount} ${storeWord}:`,
     closing: "Might take a bit longer than usual with the full list — thanks for taking this on! 🧡",
+    empty: (today) => `🛒 Weekly shop check (${today}) — nothing on the list this week, we're all stocked up! 🎉`,
   },
   quick: {
     greeting: (today) => `⚡ Quick trip needed — just a few bits today (${today}):`,
     closing: "Shouldn't take long, thank you!",
+    empty: (today) => `⚡ Quick check (${today}) — nothing needed right now, all good! 🎉`,
   },
 };
 
@@ -1727,9 +1740,10 @@ let activeWhatsAppScenario = "standard";
 function buildWhatsAppMessage(scenario) {
   const pending = items.filter((i) => i.status === "pending");
   const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+  const config = WHATSAPP_SCENARIOS[scenario] || WHATSAPP_SCENARIOS.standard;
 
   if (pending.length === 0) {
-    return `Hey! 👋 Nothing left on today's shopping list (${today}) — we're all done! 🎉`;
+    return config.empty(today);
   }
 
   const byStore = {};
@@ -1742,7 +1756,6 @@ function buildWhatsAppMessage(scenario) {
   const storeCount = Object.keys(byStore).length;
   const itemWord = pending.length === 1 ? "item" : "items";
   const storeWord = storeCount === 1 ? "store" : "stores";
-  const config = WHATSAPP_SCENARIOS[scenario] || WHATSAPP_SCENARIOS.standard;
 
   let msg = `${config.greeting(today, pending.length, itemWord, storeCount, storeWord)}\n`;
   for (const [store, lines] of Object.entries(byStore)) {
@@ -1759,7 +1772,7 @@ function renderWhatsAppPreview(scenario) {
   const preview = $("whatsapp-preview");
 
   if (pending.length === 0) {
-    preview.innerHTML = `<p style="margin:0;">Hey! 👋 Nothing left on today's shopping list (${today}) — we're all done! 🎉</p>`;
+    preview.innerHTML = `<p style="margin:0;">${escapeHtml(config.empty(today))}</p>`;
     return;
   }
 

@@ -67,6 +67,8 @@
       <h2 style="margin-bottom:8px;"><i class="ti ti-repeat" aria-hidden="true"></i> Recurring items</h2>
       <div class="row">
         <input id="recurring-name-input" type="text" placeholder="Item name (e.g. Milk)" list="item-name-history" autocomplete="off" />
+      </div>
+      <div class="row">
         <select id="recurring-day-select">
           <option value="0">Every Sunday</option>
           <option value="1">Every Monday</option>
@@ -76,6 +78,7 @@
           <option value="5">Every Friday</option>
           <option value="6">Every Saturday</option>
         </select>
+        <select id="recurring-store-select"></select>
       </div>
       <button id="add-recurring-btn" class="btn primary small"><i class="ti ti-plus" aria-hidden="true"></i> Add recurring item</button>
       <div id="recurring-chips" class="quick-add-scroll hidden" style="margin-top:10px;"></div>
