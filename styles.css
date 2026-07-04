@@ -286,10 +286,10 @@ input:focus, select:focus, textarea:focus {
 
 .delete-btn, .edit-btn {
   width: auto;
-  padding: 6px 8px;
+  padding: 8px 10px;
   background: transparent;
   border: none;
-  font-size: 15px;
+  font-size: 19px;
   margin: 0;
   flex: 0 0 auto;
 }
