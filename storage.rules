@@ -1,17 +1,11 @@
-rules_version = '2';
-
 // ============================================================
-// Firebase Storage security rules — Family Shopping List
-// Deploy: Firebase Console > Storage > Rules tab > paste > Publish
-// (or `firebase deploy --only storage` if using the CLI)
+// UNUSED — not needed for this project.
+//
+// Firebase Storage now requires the paid Blaze plan (as of Feb 2026),
+// so this app was changed to skip Storage entirely: receipt photos are
+// read on-device for OCR only and never uploaded anywhere. The app runs
+// entirely on the free Spark plan (Auth + Firestore only) — no credit
+// card, no billing.
+//
+// This file is safe to ignore/delete.
 // ============================================================
-service firebase.storage {
-  match /b/{bucket}/o {
-    match /receipts/{householdId}/{fileName} {
-      // anyone with the link can view (simplest for a family app); only signed-in
-      // users can upload. Tighten further later if desired.
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-  }
-}

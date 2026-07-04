@@ -1,7 +1,9 @@
 # Family Shopping List — Setup Guide (Firebase)
 
-Files: `index.html`, `styles.css`, `app.js`, `config.js`, `firestore.rules`.
+Files: `index.html`, `styles.css`, `app.js`, `config.js`, `firestore.rules`, `manifest.json`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`.
 (`schema.sql` and `storage.rules` are leftover from earlier versions — ignore/delete them.)
+
+Push all of these to your repo (including the icon files and `manifest.json`) so "Add to Home Screen" picks up the app icon correctly.
 
 This build has no login, no household codes, no Storage — everyone with the app link shares one list, and it runs entirely on the free Spark plan. No credit card, ever.
 

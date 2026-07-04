@@ -4,6 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
 <title>Family Shopping List</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#534AB7" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Shopping List" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/dist/tabler-icons.min.css" />
 <link rel="stylesheet" href="styles.css" />
 </head>
@@ -27,11 +34,12 @@
       <strong>Family Shopping List</strong>
       <div class="muted small">Hi, <span id="user-name-label"></span> · <button id="change-name-btn" class="link-btn">not you?</button></div>
     </div>
+    <button id="theme-toggle-btn" class="icon-btn" aria-label="Toggle dark mode"><i class="ti ti-moon" aria-hidden="true"></i></button>
   </header>
 
   <nav class="top-tabs">
     <button class="tab-btn active" data-view="list"><i class="ti ti-list-check" aria-hidden="true"></i> List</button>
-    <button class="tab-btn" data-view="confirm"><i class="ti ti-receipt-2" aria-hidden="true"></i> Confirm amounts <span class="tab-badge hidden" id="confirm-badge">0</span></button>
+    <button class="tab-btn" data-view="confirm"><i class="ti ti-receipt-2" aria-hidden="true"></i> Confirm <span class="tab-badge hidden" id="confirm-badge">0</span></button>
     <button class="tab-btn" data-view="spend"><i class="ti ti-chart-bar" aria-hidden="true"></i> Spend</button>
     <button class="tab-btn" data-view="whatsapp"><i class="ti ti-brand-whatsapp" aria-hidden="true"></i> WhatsApp</button>
   </nav>
@@ -45,7 +53,7 @@
         <select id="new-item-store"></select>
       </div>
       <div class="row">
-        <input id="new-item-qty" type="text" placeholder="Qty (optional)" class="qty-input" />
+        <input id="new-item-qty" type="text" placeholder="Qty" class="qty-input" />
         <button id="add-item-btn" class="btn primary"><i class="ti ti-plus" aria-hidden="true"></i> Add</button>
       </div>
     </div>
@@ -59,14 +67,20 @@
     </div>
 
     <ul id="items-list" class="items-list"></ul>
-    <p id="items-empty" class="muted centered hidden"><i class="ti ti-confetti" aria-hidden="true"></i> Nothing here yet</p>
+    <div id="items-empty" class="empty-state hidden">
+      <div class="empty-illustration accent"><i class="ti ti-confetti" aria-hidden="true"></i></div>
+      <p>Nothing here yet</p>
+    </div>
   </div>
 
   <!-- ---- CONFIRM AMOUNTS VIEW ---- -->
   <div id="view-confirm" class="view hidden">
     <p class="muted small">Ticked items land here until you record what they cost.</p>
     <ul id="confirm-list" class="items-list"></ul>
-    <p id="confirm-empty" class="muted centered hidden"><i class="ti ti-confetti" aria-hidden="true"></i> Nothing waiting on a price</p>
+    <div id="confirm-empty" class="empty-state hidden">
+      <div class="empty-illustration accent"><i class="ti ti-confetti" aria-hidden="true"></i></div>
+      <p>Nothing waiting on a price</p>
+    </div>
   </div>
 
   <!-- ---- SPEND / DASHBOARD VIEW ---- -->
@@ -91,7 +105,10 @@
     <div class="card">
       <h2><i class="ti ti-history" aria-hidden="true"></i> Recently bought</h2>
       <ul id="recent-done-list" class="receipts-list"></ul>
-      <p id="recent-done-empty" class="muted small hidden">Nothing recorded yet.</p>
+      <div id="recent-done-empty" class="empty-state hidden">
+        <div class="empty-illustration"><i class="ti ti-receipt-2" aria-hidden="true"></i></div>
+        <p>Nothing recorded yet</p>
+      </div>
     </div>
   </div>
 
@@ -107,6 +124,11 @@
   </div>
 
 </section>
+
+<div id="undo-toast" class="undo-toast hidden">
+  <span id="undo-toast-text">Item deleted</span>
+  <button id="undo-toast-btn" class="link-btn">Undo</button>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script type="module" src="config.js"></script>

@@ -60,6 +60,30 @@ const $ = (id) => document.getElementById(id);
 const allStores = () => PRESET_STORES;
 
 // ------------------------------------------------------------------
+// Dark mode
+// ------------------------------------------------------------------
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  const icon = $("theme-toggle-btn").querySelector("i");
+  if (icon) icon.className = theme === "dark" ? "ti ti-sun" : "ti ti-moon";
+}
+
+function initTheme() {
+  const saved = localStorage.getItem("shoppingListTheme");
+  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme(saved || (prefersDark ? "dark" : "light"));
+}
+
+$("theme-toggle-btn").addEventListener("click", () => {
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  const next = isDark ? "light" : "dark";
+  localStorage.setItem("shoppingListTheme", next);
+  applyTheme(next);
+});
+
+initTheme();
+
+// ------------------------------------------------------------------
 // Screen / view switching
 // ------------------------------------------------------------------
 function showScreen(name) {
@@ -127,9 +151,30 @@ function startApp() {
   $("user-name-label").textContent = userName;
   populateSelects();
   renderStoreFilterChips();
+  renderSkeleton();
   subscribeItems();
   showScreen("app-screen");
   showView("list");
+}
+
+// ------------------------------------------------------------------
+// Skeleton loader (shown briefly while the first Firestore snapshot
+// is still in flight, instead of a blank list)
+// ------------------------------------------------------------------
+function skeletonRowHtml() {
+  return `
+    <li class="skeleton-row">
+      <div class="skeleton-block circle"></div>
+      <div class="skeleton-lines">
+        <div class="skeleton-block line"></div>
+        <div class="skeleton-block line short"></div>
+      </div>
+    </li>`;
+}
+
+function renderSkeleton() {
+  $("items-empty").classList.add("hidden");
+  $("items-list").innerHTML = skeletonRowHtml().repeat(4);
 }
 
 // ------------------------------------------------------------------
@@ -266,52 +311,81 @@ function storeFor(item) {
 // ------------------------------------------------------------------
 // List view
 // ------------------------------------------------------------------
+function itemRowHtml(item) {
+  const cat = categoryFor(item);
+  const store = storeFor(item);
+  const catBg = cat ? cat.bg : "#F1EFE8";
+  const catFg = cat ? cat.fg : "#444441";
+  const catIcon = cat ? cat.icon : "ti-category";
+  const done = item.status === "done";
+  const awaiting = item.status === "awaiting_amount";
+
+  let tickHtml;
+  if (awaiting) {
+    tickHtml = `<div class="tick-btn locked"><i class="ti ti-clock" aria-hidden="true"></i></div>`;
+  } else if (done) {
+    tickHtml = `<button class="tick-btn checked" data-action="undo" data-id="${item.id}"><i class="ti ti-check" aria-hidden="true"></i></button>`;
+  } else {
+    tickHtml = `<button class="tick-btn" data-action="toggle" data-id="${item.id}"></button>`;
+  }
+
+  let metaHtml = `${item.categoryName || ""}${store ? ` <span class="store-dot" style="background:${store.fg}"></span>${store.name}` : ""}`;
+  if (done) {
+    metaHtml += ` · $${Number(item.amount || 0).toFixed(2)} · Done ${formatDate(item.doneAt)}`;
+  } else if (awaiting) {
+    metaHtml += ` · Awaiting price`;
+  } else {
+    metaHtml += ` · Added ${formatDate(item.createdAt)}`;
+  }
+
+  const editBtn = done
+    ? `<button class="edit-btn" data-action="edit-amount" data-id="${item.id}"><i class="ti ti-pencil" aria-hidden="true"></i></button>`
+    : "";
+
+  return `
+    <li class="item-row ${done ? "done" : ""} ${awaiting ? "awaiting" : ""}" data-id="${item.id}">
+      ${tickHtml}
+      <div class="category-icon" style="background:${catBg}; color:${catFg};"><i class="ti ${catIcon}" aria-hidden="true"></i></div>
+      <div class="item-main">
+        <div class="item-name">${escapeHtml(item.name)}${item.quantity ? ` <span class="muted small">(${escapeHtml(item.quantity)})</span>` : ""}</div>
+        <div class="item-meta">${metaHtml}</div>
+      </div>
+      ${editBtn}
+      <button class="delete-btn" data-action="delete" data-id="${item.id}"><i class="ti ti-trash" aria-hidden="true"></i></button>
+    </li>`;
+}
+
 function renderItems() {
-  let filtered = items.filter((i) => i.status !== "awaiting_amount" || activeStatusFilter === "all");
+  let filtered = items.filter((i) => !pendingDeletes.has(i.id));
+  filtered = filtered.filter((i) => i.status !== "awaiting_amount" || activeStatusFilter === "all");
   if (activeStoreFilter !== "all") filtered = filtered.filter((i) => i.storeId === activeStoreFilter);
   if (activeStatusFilter === "pending") filtered = filtered.filter((i) => i.status === "pending");
   if (activeStatusFilter === "done") filtered = filtered.filter((i) => i.status === "done");
 
   const list = $("items-list");
-  list.innerHTML = filtered.map((item) => {
-    const cat = categoryFor(item);
-    const store = storeFor(item);
-    const catBg = cat ? cat.bg : "#F1EFE8";
-    const catFg = cat ? cat.fg : "#444441";
-    const catIcon = cat ? cat.icon : "ti-category";
-    const done = item.status === "done";
-    const awaiting = item.status === "awaiting_amount";
 
-    let tickHtml;
-    if (awaiting) {
-      tickHtml = `<div class="tick-btn locked"><i class="ti ti-clock" aria-hidden="true"></i></div>`;
-    } else if (done) {
-      tickHtml = `<button class="tick-btn checked" data-action="undo" data-id="${item.id}"><i class="ti ti-check" aria-hidden="true"></i></button>`;
-    } else {
-      tickHtml = `<button class="tick-btn" data-action="toggle" data-id="${item.id}"></button>`;
-    }
+  // Group visually by category, following the CATEGORIES preset order.
+  const groups = new Map();
+  filtered.forEach((item) => {
+    const key = item.categoryId || "other";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  });
 
-    let metaHtml = `${item.categoryName || ""}${store ? ` <span class="store-dot" style="background:${store.fg}"></span>${store.name}` : ""}`;
-    if (done) {
-      metaHtml += ` · $${Number(item.amount || 0).toFixed(2)} · Done ${formatDate(item.doneAt)}`;
-    } else if (awaiting) {
-      metaHtml += ` · Awaiting price`;
-    } else {
-      metaHtml += ` · Added ${formatDate(item.createdAt)}`;
-    }
+  let html = "";
+  CATEGORIES.forEach((cat) => {
+    const group = groups.get(cat.id);
+    if (!group || group.length === 0) return;
+    html += `<li class="category-header"><i class="ti ${cat.icon}" aria-hidden="true"></i> ${cat.name}</li>`;
+    html += group.map(itemRowHtml).join("");
+    groups.delete(cat.id);
+  });
+  // Any leftover items whose categoryId didn't match a known preset.
+  groups.forEach((group) => {
+    html += group.map(itemRowHtml).join("");
+  });
 
-    return `
-      <li class="item-row ${done ? "done" : ""} ${awaiting ? "awaiting" : ""}" data-id="${item.id}">
-        ${tickHtml}
-        <div class="category-icon" style="background:${catBg}; color:${catFg};"><i class="ti ${catIcon}" aria-hidden="true"></i></div>
-        <div class="item-main">
-          <div class="item-name">${escapeHtml(item.name)}${item.quantity ? ` <span class="muted small">(${escapeHtml(item.quantity)})</span>` : ""}</div>
-          <div class="item-meta">${metaHtml}</div>
-        </div>
-        <button class="delete-btn" data-action="delete" data-id="${item.id}"><i class="ti ti-trash" aria-hidden="true"></i></button>
-      </li>`;
-  }).join("");
-
+  list.innerHTML = html;
   $("items-empty").classList.toggle("hidden", filtered.length > 0);
 }
 
@@ -324,23 +398,85 @@ $("items-list").addEventListener("click", async (e) => {
     await updateDoc(itemRef, { status: "awaiting_amount" });
   } else if (btn.dataset.action === "undo") {
     await updateDoc(itemRef, { status: "pending", amount: null, doneAt: null });
+  } else if (btn.dataset.action === "edit-amount") {
+    const item = items.find((i) => i.id === id);
+    const current = item && item.amount != null ? item.amount : "";
+    const next = window.prompt("Update the amount for this item:", current);
+    if (next === null) return;
+    const parsed = parseFloat(next);
+    if (!parsed || parsed <= 0) {
+      alert("Enter a valid amount.");
+      return;
+    }
+    await updateDoc(itemRef, { amount: parsed });
   } else if (btn.dataset.action === "delete") {
-    await deleteDoc(itemRef);
+    const row = btn.closest(".item-row");
+    if (row) {
+      row.classList.add("removing");
+      setTimeout(() => scheduleDelete(id), 200);
+    } else {
+      scheduleDelete(id);
+    }
   }
+});
+
+// ------------------------------------------------------------------
+// Undo-on-delete: soft-delete with a brief undo window before the
+// document is actually removed from Firestore.
+// ------------------------------------------------------------------
+const pendingDeletes = new Set();
+const deleteTimers = {};
+
+async function finalizeDelete(id) {
+  if (!pendingDeletes.has(id)) return;
+  pendingDeletes.delete(id);
+  clearTimeout(deleteTimers[id]);
+  delete deleteTimers[id];
+  await deleteDoc(doc(db, "items", id));
+}
+
+function scheduleDelete(id) {
+  // Only one item is undoable at a time — finalize any earlier pending
+  // delete right away so the toast always matches what Undo restores.
+  [...pendingDeletes].forEach((otherId) => {
+    if (otherId !== id) finalizeDelete(otherId);
+  });
+
+  const item = items.find((i) => i.id === id);
+  pendingDeletes.add(id);
+  renderItems();
+  renderConfirmBadge();
+
+  $("undo-toast-text").textContent = item ? `Deleted "${item.name}"` : "Item deleted";
+  $("undo-toast").classList.remove("hidden");
+
+  clearTimeout(deleteTimers[id]);
+  deleteTimers[id] = setTimeout(() => {
+    finalizeDelete(id);
+    $("undo-toast").classList.add("hidden");
+  }, 5000);
+}
+
+$("undo-toast-btn").addEventListener("click", () => {
+  pendingDeletes.forEach((id) => clearTimeout(deleteTimers[id]));
+  pendingDeletes.clear();
+  $("undo-toast").classList.add("hidden");
+  renderItems();
+  renderConfirmBadge();
 });
 
 // ------------------------------------------------------------------
 // Confirm amounts view
 // ------------------------------------------------------------------
 function renderConfirmBadge() {
-  const count = items.filter((i) => i.status === "awaiting_amount").length;
+  const count = items.filter((i) => i.status === "awaiting_amount" && !pendingDeletes.has(i.id)).length;
   const badge = $("confirm-badge");
   badge.textContent = count;
   badge.classList.toggle("hidden", count === 0);
 }
 
 function renderConfirm() {
-  const awaiting = items.filter((i) => i.status === "awaiting_amount");
+  const awaiting = items.filter((i) => i.status === "awaiting_amount" && !pendingDeletes.has(i.id));
   const list = $("confirm-list");
   list.innerHTML = awaiting.map((item) => {
     const cat = categoryFor(item);
@@ -386,7 +522,7 @@ let chartByStore = null;
 let chartByCategory = null;
 
 function renderDashboard() {
-  const doneItems = items.filter((i) => i.status === "done");
+  const doneItems = items.filter((i) => i.status === "done" && !pendingDeletes.has(i.id));
   const now = new Date();
 
   const monthTotal = doneItems
