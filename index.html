@@ -82,6 +82,16 @@
       <p id="recurring-empty" class="muted small" style="margin-top:8px;">No recurring items yet — add one above, like Milk every Sunday.</p>
     </div>
 
+    <div class="card templates-card">
+      <h2 style="margin-bottom:8px;"><i class="ti ti-bookmarks" aria-hidden="true"></i> Shopping list templates</h2>
+      <div class="row">
+        <input id="template-name-input" type="text" placeholder="Template name (e.g. BBQ list)" autocomplete="off" />
+        <button id="save-template-btn" class="btn primary small"><i class="ti ti-device-floppy" aria-hidden="true"></i> Save current list</button>
+      </div>
+      <div id="templates-list" style="margin-top:10px;"></div>
+      <p id="templates-empty" class="muted small" style="margin-top:8px;">No templates yet — add some pending items, then save them as a reusable list above (e.g. "BBQ list" or "Diwali list").</p>
+    </div>
+
     <div class="add-item-card card">
       <input id="new-item-name" type="text" placeholder="Add an item... (e.g. Milk)" list="item-name-history" autocomplete="off" />
       <datalist id="item-name-history"></datalist>
@@ -104,6 +114,15 @@
       <button class="seg active" data-status="pending">Pending</button>
       <button class="seg" data-status="done">Done</button>
       <button class="seg" data-status="all">All</button>
+    </div>
+
+    <div class="row" style="margin-bottom:10px;">
+      <select id="sort-select">
+        <option value="category">Sort: Category</option>
+        <option value="name">Sort: Name (A-Z)</option>
+        <option value="recent">Sort: Recently added</option>
+        <option value="price">Sort: Price (high to low)</option>
+      </select>
     </div>
 
     <ul id="items-list" class="items-list"></ul>
@@ -137,6 +156,16 @@
       <button id="dismiss-summary-btn" class="link-btn">Dismiss</button>
     </div>
 
+    <div id="weekly-summary-banner" class="card summary-banner hidden">
+      <div class="summary-banner-icon"><i class="ti ti-calendar-week" aria-hidden="true"></i></div>
+      <div class="item-main">
+        <div class="item-name">This week's check-in</div>
+        <div class="item-meta" id="weekly-summary-total-label"></div>
+      </div>
+      <button id="copy-weekly-summary-btn" class="btn primary small">Copy</button>
+      <button id="dismiss-weekly-summary-btn" class="link-btn">Dismiss</button>
+    </div>
+
     <div class="stat-pill-row">
       <div class="stat-pill"><i class="ti ti-list-check" aria-hidden="true"></i> <strong id="stat-pending">0</strong> pending</div>
       <div class="stat-pill"><i class="ti ti-check" aria-hidden="true"></i> <strong id="stat-done-month">0</strong> bought this month</div>
@@ -154,6 +183,8 @@
         <p id="budget-caption" class="muted small" style="margin:8px 0 0;"></p>
       </div>
       <p id="budget-unset" class="muted small">No monthly budget set yet — tap the pencil to add one so everyone can see how spending is tracking.</p>
+
+      <div id="store-budgets-list" class="store-budget-list"></div>
     </div>
 
     <div class="card">
@@ -172,9 +203,19 @@
     </div>
 
     <div class="card">
+      <h2><i class="ti ti-search" aria-hidden="true"></i> Search purchase history</h2>
+      <input id="history-search-input" type="text" placeholder="e.g. printer ink" autocomplete="off" />
+      <ul id="history-search-results" class="receipts-list" style="margin-top:8px;"></ul>
+      <p id="history-search-empty" class="muted small hidden">No matches yet — try a different search.</p>
+    </div>
+
+    <div class="card">
       <div class="budget-header">
         <h2 style="margin:0;"><i class="ti ti-history" aria-hidden="true"></i> Recently bought</h2>
-        <button id="export-csv-btn" class="edit-btn" aria-label="Export spend history as CSV"><i class="ti ti-download" aria-hidden="true"></i></button>
+        <div class="row" style="gap:4px; margin:0;">
+          <button id="export-csv-btn" class="edit-btn" aria-label="Export spend history as CSV"><i class="ti ti-download" aria-hidden="true"></i></button>
+          <button id="clear-history-btn" class="delete-btn" aria-label="Clear all spend history"><i class="ti ti-trash" aria-hidden="true"></i></button>
+        </div>
       </div>
       <ul id="recent-done-list" class="receipts-list"></ul>
       <div id="recent-done-empty" class="empty-state hidden">
@@ -190,8 +231,15 @@
       <div class="whatsapp-hero-icon"><i class="ti ti-brand-whatsapp" aria-hidden="true"></i></div>
       <div>
         <h2 style="margin-bottom:2px;">Nudge message</h2>
-        <p class="muted small" style="margin:0;">Drafted for you, ready to paste into any WhatsApp chat.</p>
+        <p class="muted small" style="margin:0;">Pick a scenario, then copy and paste into any WhatsApp chat.</p>
       </div>
+    </div>
+
+    <div class="whatsapp-scenario-scroll" id="whatsapp-scenario-picker">
+      <button class="whatsapp-scenario-chip active" data-scenario="standard" style="background:#E6F1FB; color:#0C447C;"><i class="ti ti-message-circle" aria-hidden="true"></i> Standard</button>
+      <button class="whatsapp-scenario-chip" data-scenario="urgent" style="background:#FBEAF0; color:#72243E;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Urgent</button>
+      <button class="whatsapp-scenario-chip" data-scenario="weekly" style="background:#EEEDFE; color:#26215C;"><i class="ti ti-calendar-stats" aria-hidden="true"></i> Weekly big shop</button>
+      <button class="whatsapp-scenario-chip" data-scenario="quick" style="background:#FAEEDA; color:#633806;"><i class="ti ti-bolt" aria-hidden="true"></i> Quick trip</button>
     </div>
 
     <div class="stat-pill-row">
@@ -210,7 +258,8 @@
         </div>
       </div>
       <div class="whatsapp-bubble-wrap">
-        <textarea id="whatsapp-message" class="whatsapp-bubble" rows="12" readonly></textarea>
+        <div id="whatsapp-preview" class="whatsapp-bubble whatsapp-preview"></div>
+        <textarea id="whatsapp-message" class="hidden" rows="12" readonly></textarea>
       </div>
       <button id="copy-whatsapp-btn" class="btn whatsapp"><i class="ti ti-copy" aria-hidden="true"></i> Copy message</button>
       <p id="copy-status" class="muted small"></p>
@@ -222,6 +271,10 @@
 <div id="undo-toast" class="undo-toast hidden">
   <span id="undo-toast-text">Item deleted</span>
   <button id="undo-toast-btn" class="link-btn">Undo</button>
+</div>
+
+<div id="offline-banner" class="offline-banner hidden">
+  <i class="ti ti-wifi-off" aria-hidden="true"></i> You're offline — changes will sync once you're back online.
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>

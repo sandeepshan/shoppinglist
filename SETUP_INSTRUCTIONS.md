@@ -31,6 +31,8 @@ This replaces the earlier household-based rules with a much simpler single-colle
 
 **Update again (new — needed for recurring items):** `firestore.rules` now also allows a `recurringItems` collection ("Milk every Sunday" etc.). Re-paste and re-publish `firestore.rules` one more time if you'd already published an earlier version — otherwise adding a recurring item will fail with a permissions error.
 
+**Update again (new — needed for shopping list templates):** `firestore.rules` now also allows a `templates` collection (saved lists like "BBQ list"). Re-paste and re-publish `firestore.rules` once more if you'd already published an earlier version — otherwise saving a template will fail with a permissions error.
+
 ## 4. Deploy
 
 Same as before — Netlify (drag-and-drop at app.netlify.com/drop, or connect your Git repo), or Firebase Hosting via the CLI. Once you have a live URL, add its domain to Firebase Console → Authentication → Settings → Authorized domains (still required, since Anonymous Auth is domain-restricted the same way).
@@ -57,7 +59,16 @@ Same as before — Netlify (drag-and-drop at app.netlify.com/drop, or connect yo
 - **Monthly spend summary**: once a new calendar month starts, the Spend tab shows a dismissible banner with last month's total, item count, and top stores, with a **Copy** button to paste into WhatsApp or email. Important: there's no way to make this *auto-send itself* to your family without a paid backend or WhatsApp's paid Business API — this gets it auto-drafted and ready, but someone still needs to open the Spend tab and tap Copy + paste once a month.
 - **Inventory learns your habits**: any item name added 3+ times that isn't already in the built-in catalog automatically shows up in the Inventory tab too (tagged "Yours"), grouped by category — no setup needed.
 - **CSV export**: the download icon next to "Recently bought" exports your full purchase history (name, category, store, amount, purchased by, date) as a CSV file you can open in Excel/Sheets.
-- **WhatsApp nudge**: a warm, ready-to-send message ("Hi! Today's shopping list is...") listing all pending items grouped by store, with an item/store count and a per-store breakdown up top, styled like an actual chat bubble. Tap **Copy message**, then paste it into any WhatsApp chat yourself.
+- **Clear spend history**: the trash icon next to "Recently bought" permanently deletes every recorded purchase (handy for starting fresh each year) — export a CSV first if you want a copy, since this can't be undone.
+- **Offline indicator**: a banner appears at the top of the screen if your connection drops, since the app doesn't cache data for offline use by design (avoids stale-data conflicts with the live shared list). It disappears automatically once you're back online.
+- **List sort options**: a dropdown above the list lets you switch between Category (default, groups by aisle), Name (A-Z), Recently added, and Price (done items, highest first).
+- **Item notes**: tap the notes icon on any item to add a short optional note (e.g. "get the discount brand" or "check use-by date") that shows under the item name.
+- **Favoriting/pinning**: tap the star on any item (List tab) or catalog entry (Inventory tab) to pin it to the top of its category group.
+- **Search purchase history**: a search box in the Spend tab searches your *entire* purchase history (not just the last 15), so you can answer things like "when did we last buy printer ink and how much was it."
+- **Weekly spend digest**: same idea as the monthly summary, but a tighter week-by-week check-in banner — auto-surfaced each week once there's something to report, with its own Copy button.
+- **Per-store budget caps**: in addition to the overall monthly budget, set a $ cap for individual stores (e.g. the Indian Shop) from the Budget card, so you can catch one store blowing out even if the total looks fine.
+- **Shopping list templates**: save your current pending list as a named template (e.g. "BBQ list" or "Diwali list") from the List tab, then load it back in one tap next time instead of re-adding everything. Delete templates you no longer need.
+- **WhatsApp nudge**: pick a scenario — Standard, Urgent, Weekly big shop, or Quick trip — and the drafted message's tone and wording adjusts to match. The message preview is now a colorful, grouped-by-store chat bubble (not just plain text) so it's easy to scan before copying. Tap **Copy message**, then paste it into any WhatsApp chat yourself.
 
 ## What changed from the very first version
 

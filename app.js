@@ -121,6 +121,18 @@ $("theme-toggle-btn").addEventListener("click", () => {
 initTheme();
 
 // ------------------------------------------------------------------
+// Offline indicator — the app doesn't cache data for offline use by
+// design (to avoid stale-data conflicts with live Firestore), so a
+// dropped connection needs to be visible instead of silently stalling.
+// ------------------------------------------------------------------
+function updateOnlineStatus() {
+  $("offline-banner").classList.toggle("hidden", navigator.onLine);
+}
+window.addEventListener("online", updateOnlineStatus);
+window.addEventListener("offline", updateOnlineStatus);
+updateOnlineStatus();
+
+// ------------------------------------------------------------------
 // Screen / view switching
 // ------------------------------------------------------------------
 function showScreen(name) {
@@ -194,8 +206,214 @@ function startApp() {
   subscribeBudget();
   subscribeShopper();
   subscribeRecurring();
+  subscribeFavorites();
+  subscribeStoreBudgets();
+  subscribeTemplates();
   showScreen("app-screen");
   showView("list");
+}
+
+// ------------------------------------------------------------------
+// Per-store budget caps (in addition to the overall monthly budget)
+// ------------------------------------------------------------------
+let storeBudgetCaps = {};
+let unsubStoreBudgets = null;
+
+function subscribeStoreBudgets() {
+  if (unsubStoreBudgets) unsubStoreBudgets();
+  const ref = doc(db, "meta", "storeBudgets");
+  unsubStoreBudgets = onSnapshot(ref, (snap) => {
+    const data = snap.exists() ? snap.data() : null;
+    storeBudgetCaps = (data && data.caps) || {};
+    if (currentView === "spend") renderDashboard();
+  });
+}
+
+function renderStoreBudgets(monthDoneItems) {
+  const el = $("store-budgets-list");
+  const spendByStore = {};
+  monthDoneItems.forEach((i) => {
+    const key = i.storeId || "other";
+    spendByStore[key] = (spendByStore[key] || 0) + Number(i.amount || 0);
+  });
+
+  const relevantStoreIds = new Set([...Object.keys(storeBudgetCaps), ...Object.keys(spendByStore)]);
+  if (relevantStoreIds.size === 0) {
+    el.innerHTML = "";
+    return;
+  }
+
+  el.innerHTML = `<p class="muted small" style="margin:14px 0 8px;">Per-store budgets</p>` + [...relevantStoreIds].map((storeId) => {
+    const store = allStores().find((s) => s.id === storeId);
+    const label = store ? store.name : "Other";
+    const dotColor = store ? store.fg : "#444441";
+    const spend = spendByStore[storeId] || 0;
+    const cap = storeBudgetCaps[storeId];
+
+    if (cap == null) {
+      return `
+        <div class="store-budget-row">
+          <span class="store-dot" style="background:${dotColor}"></span>
+          <span class="store-budget-label">${escapeHtml(label)}</span>
+          <span class="muted small store-budget-spend">$${spend.toFixed(2)} spent</span>
+          <button class="link-btn" data-action="set-store-cap" data-store="${storeId}">Set cap</button>
+        </div>`;
+    }
+
+    const pct = Math.min(100, (spend / cap) * 100);
+    const stateClass = spend > cap ? "over" : (pct >= 80 ? "warn" : "");
+    return `
+      <div class="store-budget-row">
+        <span class="store-dot" style="background:${dotColor}"></span>
+        <span class="store-budget-label">${escapeHtml(label)}</span>
+        <div class="budget-bar-track store-budget-bar-track"><div class="budget-bar-fill ${stateClass}" style="width:${pct}%;"></div></div>
+        <span class="muted small store-budget-spend">$${spend.toFixed(2)} / $${cap.toFixed(2)}</span>
+        <button class="edit-btn" data-action="set-store-cap" data-store="${storeId}"><i class="ti ti-pencil" aria-hidden="true"></i></button>
+      </div>`;
+  }).join("");
+}
+
+$("store-budgets-list").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-action='set-store-cap']");
+  if (!btn) return;
+  const storeId = btn.dataset.store;
+  const store = allStores().find((s) => s.id === storeId);
+  const label = store ? store.name : "Other";
+  const current = storeBudgetCaps[storeId] != null ? storeBudgetCaps[storeId] : "";
+  const next = window.prompt(`Set a monthly budget cap for ${label} ($):`, current);
+  if (next === null) return;
+  const parsed = parseFloat(next);
+  if (!parsed || parsed <= 0) {
+    alert("Enter a valid amount.");
+    return;
+  }
+  const updated = { ...storeBudgetCaps, [storeId]: parsed };
+  await setDoc(doc(db, "meta", "storeBudgets"), { caps: updated }, { merge: true });
+});
+
+// ------------------------------------------------------------------
+// Shopping list templates — save the current pending list as a named
+// reusable template (e.g. "BBQ list", "Diwali list"), then load it back
+// in one tap instead of re-adding everything from scratch.
+// ------------------------------------------------------------------
+let templates = [];
+let unsubTemplates = null;
+
+function subscribeTemplates() {
+  if (unsubTemplates) unsubTemplates();
+  const templatesQuery = query(collection(db, "templates"), orderBy("createdAt", "desc"));
+  unsubTemplates = onSnapshot(templatesQuery, (snap) => {
+    templates = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderTemplates();
+  });
+}
+
+function renderTemplates() {
+  const el = $("templates-list");
+  if (templates.length === 0) {
+    el.innerHTML = "";
+    $("templates-empty").classList.remove("hidden");
+    return;
+  }
+  $("templates-empty").classList.add("hidden");
+  el.innerHTML = templates.map((t) => {
+    const count = Array.isArray(t.items) ? t.items.length : 0;
+    return `
+      <div class="template-row">
+        <div class="item-main">
+          <div class="template-name">${escapeHtml(t.name)}</div>
+          <div class="template-count">${count} item${count === 1 ? "" : "s"}</div>
+        </div>
+        <div class="row">
+          <button class="btn primary small" data-action="load-template" data-id="${t.id}">Load</button>
+          <button class="delete-btn" data-action="delete-template" data-id="${t.id}" aria-label="Delete template"><i class="ti ti-trash" aria-hidden="true"></i></button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+$("save-template-btn").addEventListener("click", async () => {
+  const name = $("template-name-input").value.trim();
+  if (!name) {
+    alert("Give the template a name first (e.g. \"BBQ list\").");
+    return;
+  }
+  const pendingItems = items.filter((i) => i.status === "pending" && !pendingDeletes.has(i.id));
+  if (pendingItems.length === 0) {
+    alert("Add some pending items to your list first, then save them as a template.");
+    return;
+  }
+  const templateItems = pendingItems.map((i) => ({
+    name: i.name,
+    categoryId: i.categoryId || null,
+    categoryName: i.categoryName || null,
+    categoryIcon: i.categoryIcon || null,
+    storeId: i.storeId || null,
+    storeName: i.storeName || null,
+    storeIcon: i.storeIcon || null,
+    quantity: i.quantity || null,
+  }));
+
+  await addDoc(collection(db, "templates"), {
+    name,
+    items: templateItems,
+    createdBy: userName,
+    createdAt: serverTimestamp(),
+  });
+
+  $("template-name-input").value = "";
+});
+
+$("templates-list").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  const template = templates.find((t) => t.id === btn.dataset.id);
+  if (!template) return;
+
+  if (btn.dataset.action === "delete-template") {
+    const confirmed = window.confirm(`Delete the template "${template.name}"? This won't affect your current list.`);
+    if (!confirmed) return;
+    await deleteDoc(doc(db, "templates", template.id));
+    return;
+  }
+
+  if (btn.dataset.action === "load-template") {
+    const templateItems = Array.isArray(template.items) ? template.items : [];
+    if (templateItems.length === 0) return;
+    await Promise.all(templateItems.map((ti) => addDoc(collection(db, "items"), {
+      name: ti.name,
+      categoryId: ti.categoryId || null,
+      categoryName: ti.categoryName || null,
+      categoryIcon: ti.categoryIcon || null,
+      storeId: ti.storeId || null,
+      storeName: ti.storeName || null,
+      storeIcon: ti.storeIcon || null,
+      quantity: ti.quantity || null,
+      status: "pending",
+      amount: null,
+      purchasedBy: null,
+      addedBy: userName,
+      createdAt: serverTimestamp(),
+      doneAt: null,
+    })));
+  }
+});
+
+// ------------------------------------------------------------------
+// Shared favorites (Inventory catalog items pinned to the top of
+// their category, regardless of purchase frequency)
+// ------------------------------------------------------------------
+let favoriteNames = new Set();
+let unsubFavorites = null;
+
+function subscribeFavorites() {
+  if (unsubFavorites) unsubFavorites();
+  const favRef = doc(db, "meta", "favorites");
+  unsubFavorites = onSnapshot(favRef, (snap) => {
+    const data = snap.exists() ? snap.data() : null;
+    favoriteNames = new Set((data && data.names) || []);
+    if (currentView === "inventory") renderInventory();
+  });
 }
 
 // ------------------------------------------------------------------
@@ -657,6 +875,10 @@ function itemRowHtml(item) {
     if (item.addedBy) metaHtml += ` by ${avatarHtml(item.addedBy, 15)} ${escapeHtml(item.addedBy)}`;
   }
 
+  const noteHtml = item.note ? `<div class="item-note"><i class="ti ti-note" aria-hidden="true"></i> ${escapeHtml(item.note)}</div>` : "";
+
+  const favBtn = `<button class="fav-btn ${item.favorite ? "active" : ""}" data-action="toggle-favorite" data-id="${item.id}" aria-label="Favorite"><i class="ti ${item.favorite ? "ti-star-filled" : "ti-star"}" aria-hidden="true"></i></button>`;
+  const noteBtn = `<button class="edit-btn" data-action="edit-note" data-id="${item.id}" aria-label="Add note"><i class="ti ti-notes" aria-hidden="true"></i></button>`;
   const editBtn = done
     ? `<button class="edit-btn" data-action="edit-amount" data-id="${item.id}"><i class="ti ti-pencil" aria-hidden="true"></i></button>`
     : "";
@@ -667,9 +889,12 @@ function itemRowHtml(item) {
       <div class="category-icon" style="background:${catBg}; color:${catFg};"><i class="ti ${catIcon}" aria-hidden="true"></i></div>
       <div class="item-main">
         <div class="item-name">${escapeHtml(item.name)}${item.quantity ? ` <span class="muted small">(${escapeHtml(item.quantity)})</span>` : ""}</div>
+        ${noteHtml}
         <div class="item-meta">${metaHtml}</div>
       </div>
+      ${favBtn}
       ${editBtn}
+      ${noteBtn}
       <button class="delete-btn" data-action="delete" data-id="${item.id}"><i class="ti ti-trash" aria-hidden="true"></i></button>
     </li>`;
 }
@@ -695,6 +920,8 @@ function editingRowHtml(item) {
     </li>`;
 }
 
+let activeSortMode = "category";
+
 function renderItems() {
   let filtered = items.filter((i) => !pendingDeletes.has(i.id));
   if (activeStoreFilter !== "all") filtered = filtered.filter((i) => i.storeId === activeStoreFilter);
@@ -702,31 +929,56 @@ function renderItems() {
   if (activeStatusFilter === "done") filtered = filtered.filter((i) => i.status === "done");
 
   const list = $("items-list");
-
-  // Group visually by category, following the CATEGORIES preset order.
-  const groups = new Map();
-  filtered.forEach((item) => {
-    const key = item.categoryId || "other";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(item);
-  });
-
   let html = "";
-  CATEGORIES.forEach((cat) => {
-    const group = groups.get(cat.id);
-    if (!group || group.length === 0) return;
-    html += `<li class="category-header"><i class="ti ${cat.icon}" aria-hidden="true"></i> ${cat.name}</li>`;
-    html += group.map(itemRowHtml).join("");
-    groups.delete(cat.id);
-  });
-  // Any leftover items whose categoryId didn't match a known preset.
-  groups.forEach((group) => {
-    html += group.map(itemRowHtml).join("");
-  });
+
+  if (activeSortMode === "category") {
+    // Group visually by category, following the CATEGORIES preset order.
+    // Favorited items are pinned to the top within each group.
+    const groups = new Map();
+    filtered.forEach((item) => {
+      const key = item.categoryId || "other";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(item);
+    });
+    groups.forEach((group) => {
+      group.sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0));
+    });
+
+    CATEGORIES.forEach((cat) => {
+      const group = groups.get(cat.id);
+      if (!group || group.length === 0) return;
+      html += `<li class="category-header"><i class="ti ${cat.icon}" aria-hidden="true"></i> ${cat.name}</li>`;
+      html += group.map(itemRowHtml).join("");
+      groups.delete(cat.id);
+    });
+    // Any leftover items whose categoryId didn't match a known preset.
+    groups.forEach((group) => {
+      html += group.map(itemRowHtml).join("");
+    });
+  } else {
+    let sorted = [...filtered];
+    if (activeSortMode === "name") {
+      sorted.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    } else if (activeSortMode === "recent") {
+      sorted.sort((a, b) => {
+        const da = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate().getTime() : 0;
+        const db_ = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate().getTime() : 0;
+        return db_ - da;
+      });
+    } else if (activeSortMode === "price") {
+      sorted.sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0));
+    }
+    html = sorted.map(itemRowHtml).join("");
+  }
 
   list.innerHTML = html;
   $("items-empty").classList.toggle("hidden", filtered.length > 0);
 }
+
+$("sort-select").addEventListener("change", () => {
+  activeSortMode = $("sort-select").value;
+  renderItems();
+});
 
 $("items-list").addEventListener("click", async (e) => {
   const btn = e.target.closest("button");
@@ -767,6 +1019,15 @@ $("items-list").addEventListener("click", async (e) => {
     const nextPurchasedBy = window.prompt("Purchased by:", currentPurchasedBy);
     if (nextPurchasedBy === null) return;
     await updateDoc(itemRef, { amount: parsedAmount, purchasedBy: nextPurchasedBy.trim() || null });
+  } else if (btn.dataset.action === "toggle-favorite") {
+    const item = items.find((i) => i.id === id);
+    await updateDoc(itemRef, { favorite: !(item && item.favorite) });
+  } else if (btn.dataset.action === "edit-note") {
+    const item = items.find((i) => i.id === id);
+    const current = item && item.note ? item.note : "";
+    const next = window.prompt('Note for this item (e.g. "get the discount brand"):', current);
+    if (next === null) return;
+    await updateDoc(itemRef, { note: next.trim() || null });
   } else if (btn.dataset.action === "delete") {
     const row = btn.closest(".item-row");
     if (row) {
@@ -1000,6 +1261,14 @@ function renderInventory() {
     if (!groups.has(inv.categoryId)) groups.set(inv.categoryId, []);
     groups.get(inv.categoryId).push(inv);
   });
+  // Favorited items are pinned to the top within each category group.
+  groups.forEach((group) => {
+    group.sort((a, b) => {
+      const favA = favoriteNames.has(a.name.toLowerCase()) ? 1 : 0;
+      const favB = favoriteNames.has(b.name.toLowerCase()) ? 1 : 0;
+      return favB - favA;
+    });
+  });
 
   let html = "";
   CATEGORIES.forEach((cat) => {
@@ -1008,7 +1277,9 @@ function renderInventory() {
     html += `<li class="category-header"><i class="ti ${cat.icon}" aria-hidden="true"></i> ${cat.name}</li>`;
     html += group.map((inv) => {
       const inList = activeNames.has(inv.name.toLowerCase());
+      const isFav = favoriteNames.has(inv.name.toLowerCase());
       const customTag = inv.custom ? `<span class="custom-tag">Yours</span>` : "";
+      const favBtn = `<button class="fav-btn ${isFav ? "active" : ""}" data-action="toggle-inv-favorite" data-name="${escapeHtml(inv.name)}" aria-label="Favorite"><i class="ti ${isFav ? "ti-star-filled" : "ti-star"}" aria-hidden="true"></i></button>`;
       const action = inList
         ? `<span class="in-list-badge"><i class="ti ti-check" aria-hidden="true"></i> In list</span>`
         : `<button class="btn primary small" data-action="inv-add" data-name="${escapeHtml(inv.name)}" data-category="${cat.id}"><i class="ti ti-plus" aria-hidden="true"></i> Add</button>`;
@@ -1016,6 +1287,7 @@ function renderInventory() {
         <li class="inventory-row">
           <div class="category-icon" style="background:${cat.bg}; color:${cat.fg};"><i class="ti ${cat.icon}" aria-hidden="true"></i></div>
           <div class="item-main"><div class="item-name">${escapeHtml(inv.name)}${customTag}</div></div>
+          ${favBtn}
           ${action}
         </li>`;
     }).join("");
@@ -1028,26 +1300,38 @@ function renderInventory() {
 $("inventory-search").addEventListener("input", renderInventory);
 
 $("inventory-list").addEventListener("click", async (e) => {
-  const btn = e.target.closest("button[data-action='inv-add']");
+  const btn = e.target.closest("button");
   if (!btn) return;
-  const name = btn.dataset.name;
-  const category = CATEGORIES.find((c) => c.id === btn.dataset.category);
-  await addDoc(collection(db, "items"), {
-    name,
-    categoryId: category ? category.id : null,
-    categoryName: category ? category.name : null,
-    categoryIcon: category ? category.icon : null,
-    storeId: null,
-    storeName: null,
-    storeIcon: null,
-    quantity: null,
-    status: "pending",
-    amount: null,
-    purchasedBy: null,
-    addedBy: userName,
-    createdAt: serverTimestamp(),
-    doneAt: null,
-  });
+
+  if (btn.dataset.action === "toggle-inv-favorite") {
+    const key = btn.dataset.name.trim().toLowerCase();
+    const next = new Set(favoriteNames);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    await setDoc(doc(db, "meta", "favorites"), { names: [...next] }, { merge: true });
+    return;
+  }
+
+  if (btn.dataset.action === "inv-add") {
+    const name = btn.dataset.name;
+    const category = CATEGORIES.find((c) => c.id === btn.dataset.category);
+    await addDoc(collection(db, "items"), {
+      name,
+      categoryId: category ? category.id : null,
+      categoryName: category ? category.name : null,
+      categoryIcon: category ? category.icon : null,
+      storeId: null,
+      storeName: null,
+      storeIcon: null,
+      quantity: null,
+      status: "pending",
+      amount: null,
+      purchasedBy: null,
+      addedBy: userName,
+      createdAt: serverTimestamp(),
+      doneAt: null,
+    });
+  }
 });
 
 // ------------------------------------------------------------------
@@ -1061,19 +1345,13 @@ function renderDashboard() {
   const doneItems = items.filter((i) => i.status === "done" && !pendingDeletes.has(i.id));
   const now = new Date();
 
-  const monthTotal = doneItems
-    .filter((i) => {
-      const d = i.doneAt && i.doneAt.toDate ? i.doneAt.toDate() : null;
-      return d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-    })
-    .reduce((sum, i) => sum + Number(i.amount || 0), 0);
-
-  const allTimeTotal = doneItems.reduce((sum, i) => sum + Number(i.amount || 0), 0);
-
-  const doneThisMonth = doneItems.filter((i) => {
+  const monthDoneItems = doneItems.filter((i) => {
     const d = i.doneAt && i.doneAt.toDate ? i.doneAt.toDate() : null;
     return d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-  }).length;
+  });
+  const monthTotal = monthDoneItems.reduce((sum, i) => sum + Number(i.amount || 0), 0);
+  const allTimeTotal = doneItems.reduce((sum, i) => sum + Number(i.amount || 0), 0);
+  const doneThisMonth = monthDoneItems.length;
 
   $("stat-pending").textContent = items.filter((i) => i.status === "pending").length;
   $("stat-done-month").textContent = doneThisMonth;
@@ -1081,7 +1359,9 @@ function renderDashboard() {
   $("stat-all-total").textContent = `$${allTimeTotal.toFixed(2)}`;
 
   renderBudget(monthTotal);
+  renderStoreBudgets(monthDoneItems);
   renderMonthlySummaryBanner(doneItems);
+  renderWeeklySummaryBanner(doneItems);
 
   // Spend over time (last 6 months)
   const trendMonths = [];
@@ -1174,7 +1454,48 @@ function renderDashboard() {
     return `<li class="receipt-row" style="background:${store ? store.bg : "#F1EFE8"}; color:${store ? store.fg : "#444441"};"><span>${escapeHtml(i.name)} — ${i.storeName || "Other"} · ${formatDate(i.doneAt)}${byLine}</span><strong>$${Number(i.amount || 0).toFixed(2)}</strong></li>`;
   }).join("");
   $("recent-done-empty").classList.toggle("hidden", recent.length > 0);
+
+  renderHistorySearch();
 }
+
+// ------------------------------------------------------------------
+// Search across full purchase history (not just the recent-15 cap) —
+// "when did we last buy printer ink and how much was it."
+// ------------------------------------------------------------------
+function renderHistorySearch() {
+  const searchTerm = ($("history-search-input").value || "").trim().toLowerCase();
+  const resultsEl = $("history-search-results");
+  const emptyEl = $("history-search-empty");
+
+  if (!searchTerm) {
+    resultsEl.innerHTML = "";
+    emptyEl.classList.add("hidden");
+    return;
+  }
+
+  const matches = items
+    .filter((i) => i.status === "done" && (i.name || "").toLowerCase().includes(searchTerm))
+    .sort((a, b) => {
+      const da = a.doneAt && a.doneAt.toDate ? a.doneAt.toDate().getTime() : 0;
+      const db_ = b.doneAt && b.doneAt.toDate ? b.doneAt.toDate().getTime() : 0;
+      return db_ - da;
+    })
+    .slice(0, 30);
+
+  if (matches.length === 0) {
+    resultsEl.innerHTML = "";
+    emptyEl.classList.remove("hidden");
+    return;
+  }
+  emptyEl.classList.add("hidden");
+  resultsEl.innerHTML = matches.map((i) => {
+    const store = storeFor(i);
+    const byLine = i.purchasedBy ? ` · ${avatarHtml(i.purchasedBy, 15)} ${escapeHtml(i.purchasedBy)}` : "";
+    return `<li class="receipt-row" style="background:${store ? store.bg : "#F1EFE8"}; color:${store ? store.fg : "#444441"};"><span>${escapeHtml(i.name)} — ${i.storeName || "Other"} · ${formatDate(i.doneAt)}${byLine}</span><strong>$${Number(i.amount || 0).toFixed(2)}</strong></li>`;
+  }).join("");
+}
+
+$("history-search-input").addEventListener("input", renderHistorySearch);
 
 // ------------------------------------------------------------------
 // CSV export of spend history
@@ -1209,6 +1530,23 @@ function exportSpendCsv() {
 }
 
 $("export-csv-btn").addEventListener("click", exportSpendCsv);
+
+// ------------------------------------------------------------------
+// Clear spend history — deletes every "done" item permanently. Handy
+// after exporting a CSV, to start the dashboard fresh (e.g. a new year).
+// ------------------------------------------------------------------
+$("clear-history-btn").addEventListener("click", async () => {
+  const doneItems = items.filter((i) => i.status === "done");
+  if (doneItems.length === 0) {
+    alert("No recorded purchases to clear.");
+    return;
+  }
+  const confirmed = window.confirm(
+    `This will permanently delete all ${doneItems.length} recorded purchases (spend charts, trend, and recent-bought history). This can't be undone — export a CSV first if you want a copy. Continue?`
+  );
+  if (!confirmed) return;
+  await Promise.all(doneItems.map((i) => deleteDoc(doc(db, "items", i.id))));
+});
 
 // ------------------------------------------------------------------
 // Monthly spend summary — auto-surfaced once a new calendar month
@@ -1288,9 +1626,105 @@ $("dismiss-summary-btn").addEventListener("click", () => {
 });
 
 // ------------------------------------------------------------------
-// WhatsApp nudge (copy-paste draft, no deep link)
+// Weekly spend digest — same idea as the monthly summary, but for
+// families who want a tighter, week-by-week check-in.
 // ------------------------------------------------------------------
-function buildWhatsAppMessage() {
+function startOfWeek(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - d.getDay());
+  return d;
+}
+
+function buildWeeklySummaryMessage(doneItems, weekStart, weekEnd, weekLabel) {
+  const weekItems = doneItems.filter((i) => {
+    const d = i.doneAt && i.doneAt.toDate ? i.doneAt.toDate() : null;
+    return d && d >= weekStart && d < weekEnd;
+  });
+  const total = weekItems.reduce((sum, i) => sum + Number(i.amount || 0), 0);
+
+  let msg = `📅 ${weekLabel} spend check-in\n\n`;
+  msg += `Total spent: $${total.toFixed(2)}\n`;
+  msg += `Items bought: ${weekItems.length}\n`;
+  msg += `\nSent via Family Shopping List app`;
+  return { message: msg, total, count: weekItems.length };
+}
+
+function renderWeeklySummaryBanner(doneItems) {
+  const now = new Date();
+  const currentWeekStart = startOfWeek(now);
+  const prevWeekStart = new Date(currentWeekStart);
+  prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+  const prevWeekEnd = currentWeekStart;
+  const prevWeekKey = prevWeekStart.toISOString().slice(0, 10);
+
+  const lastSeen = localStorage.getItem("shoppingListLastWeeklySummaryWeek");
+  const weekEndDisplay = new Date(prevWeekEnd.getTime() - 86400000);
+  const weekLabel = `${prevWeekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })}–${weekEndDisplay.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+
+  const summary = buildWeeklySummaryMessage(doneItems, prevWeekStart, prevWeekEnd, weekLabel);
+  const banner = $("weekly-summary-banner");
+
+  if (lastSeen === prevWeekKey || summary.count === 0) {
+    banner.classList.add("hidden");
+    return;
+  }
+
+  banner.classList.remove("hidden");
+  banner.dataset.summaryText = summary.message;
+  banner.dataset.summaryKey = prevWeekKey;
+  $("weekly-summary-total-label").textContent = `${weekLabel}: $${summary.total.toFixed(2)} across ${summary.count} items`;
+}
+
+$("copy-weekly-summary-btn").addEventListener("click", async () => {
+  const banner = $("weekly-summary-banner");
+  const text = banner.dataset.summaryText || "";
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    // Clipboard API unavailable — fall back silently, banner stays visible.
+  }
+  localStorage.setItem("shoppingListLastWeeklySummaryWeek", banner.dataset.summaryKey || "");
+  banner.classList.add("hidden");
+});
+
+$("dismiss-weekly-summary-btn").addEventListener("click", () => {
+  const banner = $("weekly-summary-banner");
+  localStorage.setItem("shoppingListLastWeeklySummaryWeek", banner.dataset.summaryKey || "");
+  banner.classList.add("hidden");
+});
+
+// ------------------------------------------------------------------
+// WhatsApp nudge (copy-paste draft, no deep link) — with a scenario
+// picker (Standard / Urgent / Weekly big shop / Quick trip) that
+// changes the drafted message's tone, plus a colorful chat-bubble
+// preview grouped by store instead of a plain textarea.
+// ------------------------------------------------------------------
+const WHATSAPP_SCENARIOS = {
+  standard: {
+    greeting: (today, count, itemWord, storeCount, storeWord) =>
+      `Hi! 👋 Today's shopping list (${today}) — ${count} ${itemWord} across ${storeCount} ${storeWord}:`,
+    closing: "Can you grab these today? Thank you! 🛒",
+  },
+  urgent: {
+    greeting: (today, count, itemWord, storeCount, storeWord) =>
+      `🚨 Need these ASAP if you can swing by today (${today}) — ${count} ${itemWord} across ${storeCount} ${storeWord}:`,
+    closing: "Sorry for the short notice — really appreciate it! 🙏",
+  },
+  weekly: {
+    greeting: (today, count, itemWord, storeCount, storeWord) =>
+      `🛒 Weekly shop time! Full list for this week (${today}) — ${count} ${itemWord} across ${storeCount} ${storeWord}:`,
+    closing: "Might take a bit longer than usual with the full list — thanks for taking this on! 🧡",
+  },
+  quick: {
+    greeting: (today) => `⚡ Quick trip needed — just a few bits today (${today}):`,
+    closing: "Shouldn't take long, thank you!",
+  },
+};
+
+let activeWhatsAppScenario = "standard";
+
+function buildWhatsAppMessage(scenario) {
   const pending = items.filter((i) => i.status === "pending");
   const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 
@@ -1308,13 +1742,51 @@ function buildWhatsAppMessage() {
   const storeCount = Object.keys(byStore).length;
   const itemWord = pending.length === 1 ? "item" : "items";
   const storeWord = storeCount === 1 ? "store" : "stores";
+  const config = WHATSAPP_SCENARIOS[scenario] || WHATSAPP_SCENARIOS.standard;
 
-  let msg = `Hi! 👋 Today's shopping list (${today}) — ${pending.length} ${itemWord} across ${storeCount} ${storeWord}:\n`;
+  let msg = `${config.greeting(today, pending.length, itemWord, storeCount, storeWord)}\n`;
   for (const [store, lines] of Object.entries(byStore)) {
     msg += `\n*${store}*\n${lines.join("\n")}\n`;
   }
-  msg += `\nCan you grab these today? Thank you! 🛒`;
+  msg += `\n${config.closing}`;
   return msg;
+}
+
+function renderWhatsAppPreview(scenario) {
+  const pending = items.filter((i) => i.status === "pending" && !pendingDeletes.has(i.id));
+  const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+  const config = WHATSAPP_SCENARIOS[scenario] || WHATSAPP_SCENARIOS.standard;
+  const preview = $("whatsapp-preview");
+
+  if (pending.length === 0) {
+    preview.innerHTML = `<p style="margin:0;">Hey! 👋 Nothing left on today's shopping list (${today}) — we're all done! 🎉</p>`;
+    return;
+  }
+
+  const byStore = new Map();
+  pending.forEach((item) => {
+    const label = item.storeName || "Unassigned";
+    if (!byStore.has(label)) byStore.set(label, { entries: [], store: storeFor(item) });
+    byStore.get(label).entries.push(item);
+  });
+
+  const storeCount = byStore.size;
+  const itemWord = pending.length === 1 ? "item" : "items";
+  const storeWord = storeCount === 1 ? "store" : "stores";
+
+  let html = `<p class="whatsapp-preview-greeting">${escapeHtml(config.greeting(today, pending.length, itemWord, storeCount, storeWord))}</p>`;
+  byStore.forEach((info, label) => {
+    const bg = info.store ? info.store.bg : "#F1EFE8";
+    const fg = info.store ? info.store.fg : "#444441";
+    html += `<div class="whatsapp-preview-store">
+      <span class="whatsapp-preview-store-label" style="background:${bg}; color:${fg};">${escapeHtml(label)}</span>
+      <ul class="whatsapp-preview-items">
+        ${info.entries.map((i) => `<li>${escapeHtml(i.name)}${i.quantity ? ` <span class="muted small">(${escapeHtml(i.quantity)})</span>` : ""}</li>`).join("")}
+      </ul>
+    </div>`;
+  });
+  html += `<p class="whatsapp-preview-closing">${escapeHtml(config.closing)}</p>`;
+  preview.innerHTML = html;
 }
 
 function renderWhatsApp() {
@@ -1344,9 +1816,18 @@ function renderWhatsApp() {
     return `<div class="whatsapp-store-pill" style="background:${bg}; color:${fg};">${escapeHtml(label)} · ${info.count}</div>`;
   }).join("");
 
-  $("whatsapp-message").value = buildWhatsAppMessage();
+  $("whatsapp-message").value = buildWhatsAppMessage(activeWhatsAppScenario);
+  renderWhatsAppPreview(activeWhatsAppScenario);
   $("copy-status").textContent = "";
 }
+
+document.querySelectorAll("#whatsapp-scenario-picker .whatsapp-scenario-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    activeWhatsAppScenario = chip.dataset.scenario;
+    document.querySelectorAll("#whatsapp-scenario-picker .whatsapp-scenario-chip").forEach((c) => c.classList.toggle("active", c === chip));
+    renderWhatsApp();
+  });
+});
 
 $("copy-whatsapp-btn").addEventListener("click", async () => {
   const text = $("whatsapp-message").value;

@@ -29,5 +29,11 @@ service cloud.firestore {
     match /recurringItems/{docId} {
       allow read, create, update, delete: if request.auth != null;
     }
+
+    // Saved shopping list templates (e.g. "BBQ list", "Diwali list") —
+    // same everyone-can-edit model as items.
+    match /templates/{docId} {
+      allow read, create, update, delete: if request.auth != null;
+    }
   }
 }
