@@ -794,6 +794,76 @@ function subscribeItems() {
 }
 
 // ------------------------------------------------------------------
+// Voice input — fills the "Add an item" box by speech instead of
+// typing, using the browser's built-in Web Speech API (free, no
+// backend, no API key). Not supported on every browser (notably
+// iOS Safari), so the mic button only appears when the API is
+// actually available, rather than showing a button that won't work.
+// ------------------------------------------------------------------
+function initVoiceInput() {
+  const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const micBtn = $("voice-add-btn");
+  const statusEl = $("voice-status");
+  if (!SpeechRecognitionCtor) return; // leave the button hidden
+
+  const recognition = new SpeechRecognitionCtor();
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  recognition.continuous = false;
+
+  let listening = false;
+
+  recognition.onresult = (e) => {
+    const transcript = (e.results && e.results[0] && e.results[0][0] ? e.results[0][0].transcript : "").trim();
+    if (transcript) {
+      $("new-item-name").value = transcript;
+      // Reuse the existing name-autocomplete logic (fills category/store
+      // if this item's been added before) by firing the same input event.
+      $("new-item-name").dispatchEvent(new Event("input", { bubbles: true }));
+      statusEl.textContent = `Heard: "${transcript}"`;
+    } else {
+      statusEl.textContent = "Didn't catch that — try again.";
+    }
+    statusEl.classList.remove("hidden");
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+      statusEl.textContent = "Microphone permission denied.";
+    } else if (e.error === "no-speech") {
+      statusEl.textContent = "Didn't hear anything — try again.";
+    } else {
+      statusEl.textContent = "Voice input didn't work — try typing instead.";
+    }
+    statusEl.classList.remove("hidden");
+  };
+
+  recognition.onend = () => {
+    listening = false;
+    micBtn.classList.remove("listening");
+  };
+
+  micBtn.classList.remove("hidden");
+  micBtn.addEventListener("click", () => {
+    if (listening) {
+      recognition.stop();
+      return;
+    }
+    statusEl.classList.add("hidden");
+    try {
+      recognition.start();
+      listening = true;
+      micBtn.classList.add("listening");
+    } catch (e) {
+      // Already-started errors etc. — ignore, button state stays as-is.
+    }
+  });
+}
+
+initVoiceInput();
+
+// ------------------------------------------------------------------
 // Add item
 // ------------------------------------------------------------------
 $("add-item-btn").addEventListener("click", async () => {

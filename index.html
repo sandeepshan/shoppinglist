@@ -96,7 +96,11 @@
     </div>
 
     <div class="add-item-card card">
-      <input id="new-item-name" type="text" placeholder="Add an item... (e.g. Milk)" list="item-name-history" autocomplete="off" />
+      <div class="row" style="margin:6px 0;">
+        <input id="new-item-name" type="text" placeholder="Add an item... (e.g. Milk)" list="item-name-history" autocomplete="off" style="margin:0;" />
+        <button id="voice-add-btn" class="icon-btn hidden" style="flex:0 0 44px; margin:0;" aria-label="Add item by voice"><i class="ti ti-microphone" aria-hidden="true"></i></button>
+      </div>
+      <p id="voice-status" class="muted small hidden" style="margin:2px 0 6px;"></p>
       <datalist id="item-name-history"></datalist>
       <datalist id="purchased-by-history"></datalist>
       <div class="row">

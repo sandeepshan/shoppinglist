@@ -1,11 +1,11 @@
 # Family Shopping List — Setup Guide (Firebase)
 
-Files: `index.html`, `styles.css`, `app.js`, `config.js`, `firestore.rules`, `manifest.json`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, and the **`icons/` folder** (contains `icons/tabler-icons.min.css` and `icons/fonts/tabler-icons.woff2`).
-(`schema.sql` and `storage.rules` are leftover from earlier versions — ignore/delete them.)
+Files: `index.html`, `styles.css`, `app.js`, `config.js`, `firestore.rules`, `manifest.json`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, and `icons/tabler-icons.min.css`.
+(`schema.sql` and `storage.rules` are leftover from earlier versions — ignore/delete them. If you previously created `icons/fonts/tabler-icons.woff2`, it's no longer used and can be deleted too — safe to leave it in place if you'd rather not bother.)
 
-Push all of these to your repo (including the icon files, `manifest.json`, and the whole `icons/` folder) so "Add to Home Screen" picks up the app icon correctly and the in-app icons (tick marks, tabs, buttons) actually render.
+Push all of these to your repo (including the icon files, `manifest.json`, and `icons/tabler-icons.min.css`) so "Add to Home Screen" picks up the app icon correctly and the in-app icons (tick marks, tabs, buttons) actually render.
 
-**Important (new):** the app's UI icons used to load from a third-party CDN (jsdelivr). That CDN turned out to be unreliable/blocked on at least one real device, which made every icon-only button (like the export/clear icons on the Spend tab) invisible with nothing to indicate they were even there. The icon font is now self-hosted in the `icons/` folder shipped with the app, so it no longer depends on any external CDN at all — make sure `icons/` (both the `.css` file and the `fonts/tabler-icons.woff2` file inside it) gets pushed to your repo along with everything else, or the icons will be missing again.
+**Important (new):** the app's UI icons originally loaded from a third-party CDN (jsdelivr), then briefly from a self-hosted font file. Both approaches ran into real-world reliability problems (a blocked CDN, then a binary file that got mis-uploaded through GitHub's web upload flow). The icons are now built directly into `icons/tabler-icons.min.css` as inline vector graphics (no separate font file, nothing binary, no external network request at all) — it's a single plain-text CSS file, so there's nothing left that can go missing or get corrupted in upload. Just make sure `icons/tabler-icons.min.css` is present in your repo alongside everything else.
 
 This build has no login, no household codes, no Storage — everyone with the app link shares one list, and it runs entirely on the free Spark plan. No credit card, ever.
 
@@ -71,6 +71,7 @@ Same as before — Netlify (drag-and-drop at app.netlify.com/drop, or connect yo
 - **Per-store budget caps**: in addition to the overall monthly budget, set a $ cap for individual stores (e.g. the Indian Shop) from the Budget card, so you can catch one store blowing out even if the total looks fine.
 - **Shopping list templates**: save your current pending list as a named template (e.g. "BBQ list" or "Diwali list") from the List tab, then load it back in one tap next time instead of re-adding everything. Delete templates you no longer need.
 - **WhatsApp nudge**: pick a scenario — Standard, Urgent, Weekly big shop, or Quick trip — and the drafted message's tone and wording adjusts to match. The message preview is now a colorful, grouped-by-store chat bubble (not just plain text) so it's easy to scan before copying. Tap **Copy message**, then paste it into any WhatsApp chat yourself.
+- **Voice input**: a microphone icon next to the "Add an item" box lets you speak an item name instead of typing it — it fills the box, you still pick category/store/qty and tap Add as normal. Uses the browser's free built-in speech-to-text, no account or paid service involved. The mic icon only shows up on browsers that support it (works well on Chrome/Edge, including Android; support on iOS Safari is inconsistent, so the icon may not appear there at all — that's expected, not a bug, and the app works exactly the same by typing instead).
 
 ## What changed from the very first version
 
